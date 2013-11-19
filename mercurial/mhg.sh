@@ -133,33 +133,33 @@ fi
 hg_clone_options=()
 case $hg_command in
     clone)
-	while [ $# -gt 0 ]
-	do
-	    option="$1"
-	    shift
+        while [ $# -gt 0 ]
+        do
+            option="$1"
+            shift
 
-	    case $option in
-		-u | --updaterev | -r | --rev | -b | --branch | -e | --ssh | --remotecmd)
+            case $option in
+                -u | --updaterev | -r | --rev | -b | --branch | -e | --ssh | --remotecmd)
                     [ $# -gt 0 ] || missing_arg "$option"
                     hg_clone_options+=("$option" "$1")
                     shift
                     break
                     ;;
 
-		--) hg_clone_options+=("$option") ; break ;;
-		-*) hg_clone_options+=("$option") ;;
+                --) hg_clone_options+=("$option") ; break ;;
+                -*) hg_clone_options+=("$option") ;;
                 *) set -- "$option" "$@" ; break ;;
-	    esac
-	done
-	;;
+            esac
+        done
+        ;;
 
     qclone)
-	while [ $# -gt 0 ]
-	do
-	    option="$1"
-	    shift
+        while [ $# -gt 0 ]
+        do
+            option="$1"
+            shift
 
-	    case $option in
+            case $option in
                 -p | --patches | -e | --ssh | --remotecmd)
                     [ $# -gt 0 ] || missing_arg "$option"
                     hg_clone_options+=("$option" "$1")
@@ -167,12 +167,12 @@ case $hg_command in
                     break
                     ;;
 
-		--) hg_clone_options+=("$option") ; break ;;
-		-*) hg_clone_options+=("$option") ;;
+                --) hg_clone_options+=("$option") ; break ;;
+                -*) hg_clone_options+=("$option") ;;
                 *) set -- "$option" "$@" ; break ;;
-	    esac
-	done
-	;;
+            esac
+        done
+        ;;
 esac
 
 ### main ###############################################################

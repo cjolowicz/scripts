@@ -20,13 +20,13 @@ missing_arg () {
 
 verbose=false
 headers=('<stdlib.h>'
-	 '<sys/types.h>'
-	 '<inttypes.h>'
-	 '<stdint.h>'
-	 '<string.h>'
-	 '<stdbool.h>'
-	 '<unistd.h>'
-	 '<stdio.h>')
+         '<sys/types.h>'
+         '<inttypes.h>'
+         '<stdint.h>'
+         '<string.h>'
+         '<stdbool.h>'
+         '<unistd.h>'
+         '<stdio.h>')
 
 while [ $# -gt 0 ]
 do

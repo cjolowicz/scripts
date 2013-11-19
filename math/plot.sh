@@ -12,9 +12,9 @@ options:
     -h, --help              display this message
     -v, --verbose           be verbose
     -x, --xaxis COL         column number of the X axis data (1)
-    -y, --yaxis COL	    column number of the Y axis data (2)
+    -y, --yaxis COL         column number of the Y axis data (2)
     -X, --xlabel TEXT       label for the X axis (none)
-    -Y, --ylabel TEXT	    label for the Y axis (none)
+    -Y, --ylabel TEXT       label for the Y axis (none)
         --xrange NUM:NUM    range for the X axis (all)
         --yrange NUM:NUM    range for the Y axis (all)
         --xtime FORMAT      X axis is time using the specified format
@@ -111,7 +111,7 @@ do
 
     if [ -z "$smooth" -o $only_smooth = no ] ; then
         [ -z "$plots" ] || plots="$plots,"
-	plots="${plots} \"$data\" index $index using $xaxis:$yaxis with $style linecolor $linecolor title \"$plot_title\""
+        plots="${plots} \"$data\" index $index using $xaxis:$yaxis with $style linecolor $linecolor title \"$plot_title\""
     fi
 
     if [ -n "$smooth" ] ; then

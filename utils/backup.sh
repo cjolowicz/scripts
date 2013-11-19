@@ -45,16 +45,16 @@ do
     fi
 
     if [ $compress = yes ]; then
-	if [ -f "$directory"/"$backup" ]; then
+        if [ -f "$directory"/"$backup" ]; then
             gzip "$directory"/"$backup"
-	else
+        else
             (
-		if ! cd "$directory" >/dev/null 2>&1; then
-		    echo "$directory: cannot chdir" >&2
-		    exit 1
-		fi
-		tar zcf "$backup".tar.gz "$backup" --remove
+                if ! cd "$directory" >/dev/null 2>&1; then
+                    echo "$directory: cannot chdir" >&2
+                    exit 1
+                fi
+                tar zcf "$backup".tar.gz "$backup" --remove
             )
-	fi
+        fi
     fi
 done

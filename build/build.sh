@@ -60,9 +60,9 @@ if [ $# -gt 0 ] ; then
     target="$1" ; shift
 
     if ! $no_file ; then
-	case $target in */*) ;; *)
-	    target="./$target"
-	esac
+        case $target in */*) ;; *)
+            target="./$target"
+        esac
     fi
 fi
 
@@ -96,7 +96,7 @@ function run_n() {
         echo "Running tests..."
         for i in $(seq $n); do
             if ! output="$("$@")" ; then
-		print_header "$@ ($i/$n)" >&2
+                print_header "$@ ($i/$n)" >&2
                 echo "$output" >&2
                 echo >&2
                 break
