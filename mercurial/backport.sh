@@ -38,8 +38,7 @@ fi
 
 ### main ###############################################################
 
-patches=()
-patchdir="$(hg root)"/.hg/patches
+patchdir="$(hg root --mq)"
 
 mkdir -p "$patchdir"
 
@@ -53,8 +52,6 @@ for revision ; do
         echo "$prog: revision $revision not found" >&2
         exit 1
     fi
-
-    patches+=($patchname)
 
     hg log --rev $revision \
            --patch --git \
