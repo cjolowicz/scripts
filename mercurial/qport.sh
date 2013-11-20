@@ -46,7 +46,7 @@ for revision ; do
     hg log --rev=$revision --template='{node|short}  {desc|firstline}' |
     cut -c-$(tput cols)
 
-    patchname=$(hg log --rev=$revision --template='backport-{node|short}')
+    patchname=$(hg log --rev=$revision --template='qport-{node|short}')
 
     if [ -z "$patchname" ] ; then
         echo "$prog: revision $revision not found" >&2
@@ -55,7 +55,7 @@ for revision ; do
 
     hg log --rev $revision \
            --patch --git \
-           --template 'Backport {node|short}: {desc}\n\n' \
+           --template 'Import {node|short}: {desc}\n\n' \
         > "$patchdir"/$patchname
 
     stderr="$(hg qimport --existing $patchname --push 2>&1 >/dev/null)"
