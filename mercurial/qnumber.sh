@@ -50,5 +50,5 @@ do
     ((++i))
 
     hg qgoto "$patch" || exit $?
-    hg qrefresh -m"$(hg tip --template '{desc}' | sed -e "1a\\ ($i/$n)")"
+    hg qrefresh -m"$(hg tip --template '{desc}' | sed -e "1s,\$, ($i/$n),")"
 done
