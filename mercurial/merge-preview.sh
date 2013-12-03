@@ -5,11 +5,12 @@ prog=$(basename $0)
 ### functions ##########################################################
 
 usage () {
-    echo "usage: $prog [options] REV
+    echo "usage: $prog [options] [REV]
 
 options:
     -h, --help    Display this message.
 
+Print the revisions which would be merged by \`hg merge REV'.
 All options accepted by \`hg log' are also accepted by this script.
 "
     exit
@@ -28,7 +29,8 @@ bad_usage () {
 
 ### command line #######################################################
 
-options=()
+log_options=()
+merge_options=(-P)
 while [ $# -gt 0 ]
 do
     option="$1"
@@ -54,39 +56,31 @@ do
              --color         | \
              --pager)
             [ $# -gt 0 ] || bad_usage "option \`$option' requires an argument"
-            options+=("$option" "$1")
+            log_options+=("$option" "$1")
             shift
-            break
             ;;
 
         -h | --help) usage ;;
-        --) options+=("$option") ; break ;;
-        -*) options+=("$option") ;;
+        --) log_options+=("$option") ; break ;;
+        -*) log_options+=("$option") ;;
         *) set -- "$option" "$@" ; break ;;
     esac
 done
 
-[ $# -gt 0 ] || bad_usage "missing argument"
-
-revision="$1" ; shift
+if [ $# -gt 0 ] ; then
+    merge_options+=("$1")
+    shift
+fi
 
 [ $# -eq 0 ] || bad_usage "unknown argument \`$1'"
 
 ### main ###############################################################
 
-echo $revision | grep -q '^[A-Za-z0-9]+$' ||
-    revision="\"$revision\""
+set -o pipefail
 
-parents=($(hg parents --template '{node|short}\n')) ||
-    error "cannot determine parents of the working directory"
+revisions=($(hg merge "${merge_options[@]}" |
+             sed -n 's/^changeset:.*:/-r /p')) ||
+    error "cannot determine changesets to be merged"
 
-[ ${#parents[@]} -eq 1 ] ||
-    error "working directory must have a single parent"
-
-parent=${parents[0]}
-
-hg log "${options[@]}" -r "
-    descendants(ancestor($parent, $revision)) and
-    not ancestor($parent, $revision)          and
-    (ancestors($revision) or $revision)
-"
+[ ${#revisions[@]} -eq 0 ] ||
+    hg log "${log_options[@]}" "${revisions[@]}"
