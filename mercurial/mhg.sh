@@ -28,7 +28,7 @@ ignored. Boolean options take \`yes' and \`no' as arguments."
 
 parse_configuration_file () {
     printf 'configuration_options=()\n'
-    sed '/t]*\(#\|$\)/d' "$1" |
+    sed '/^[ \t]*\(#\|$\)/d' "$1" |
     while read line ; do
         case $line in
             *'=yes')
@@ -57,8 +57,10 @@ parse_configuration_file () {
 
 for configuration_file in $confdir/$prog.conf $HOME/.$prog ; do
     if [ -f $configuration_file ] ; then
-        eval "$(parse_configuration_file "$configuration_file")" || \
-            fatal "cannot read \`$configuration_file'"
+        if ! eval "$(parse_configuration_file "$configuration_file")" ; then
+            echo "cannot read \`$configuration_file'" >&2
+            exit 1
+        fi
         set -- "${configuration_options[@]}" "$@"
     fi
 done
