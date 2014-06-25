@@ -4,10 +4,16 @@ prog=$(basename $0)
 
 ### usage ##############################################################
 
-case $(pwd) in
-    */src/*) directory="$(pwd | sed 's,/src/,/build/,')" ;;
-    *)       directory=$HOME/build ;;
-esac
+directory=$HOME/build
+
+for dirname in src sources ; do
+    case $(pwd) in
+        */$dirname/*) directory="$(pwd | sed "s,/$dirname/,/build/,")" ;;
+        */$dirname)   directory="$(pwd | sed "s,/$dirname\$,/build,")" ;;
+        $dirname/*)   directory="$(pwd | sed "s,^$dirname/,build/,")" ;;
+        $dirname)     directory=build ;;
+    esac
+done
 
 repeat=0
 progress=false
