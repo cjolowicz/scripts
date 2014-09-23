@@ -2,26 +2,41 @@
 
 status=0
 
-hgroot="$(hg root)" || exit 1
+mqroot="$(hg root --mq)" || exit 1
+
+if [ -t 1 ] ; then
+    viewer=(colordiff)
+    pager=(env LESS='FSRX' less)
+else
+    viewer=(cat)
+    pager=(cat)
+fi
 
 for patch ; do
-    file="$hgroot/.hg/patches/$patch"
-
-    if ! [ -f "$file" ] ; then
-        echo "$file: no such file" >&2
-        status=1
-        continue
-    fi
-
-    if ! hg qseries | grep -q "^$patch\$" ; then
+    if ! hg qseries | fgrep --quiet "$patch" ; then
         echo "$patch: unknown patch" >&2
         status=1
         continue
     fi
 
+    file="$mqroot/$patch"
+
+    if [ ! -f "$file" ] ; then
+        patch=$(hg qseries | grep --max-count=1 "$patch")
+
+        file="$mqroot/$patch"
+    fi
+
+    if [ ! -f "$file" ] ; then
+        echo "$file: no such file" >&2
+        status=1
+
+        continue
+    fi
+
     echo "changeset: $patch"
-    colordiff < "$file"
+    "${viewer[@]}" < "$file"
 done |
-LESS='FSRX' less
+"${pager[@]}"
 
 exit $status
