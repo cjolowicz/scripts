@@ -36,7 +36,9 @@ do
         exit 1
     fi
 
-    backup="$(basename $(realpath $arg))"-$(date '+%Y%m%d-%H%M%S')
+    filename="$(basename $(realpath $arg))"
+    timestamp="$(date '+%Y%m%d-%H%M%S')"
+    backup="${filename}"~"${timestamp}"
 
     if [ $remove = yes ]; then
         mv "$arg" "$directory"/"$backup"
