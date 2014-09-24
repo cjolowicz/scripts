@@ -21,20 +21,28 @@ prog=$(basename $0)
 
 usage() {
     echo "usage: $prog [options] [files]
-.
+Store the specified files in a compressed tar archive.
 
 options:
+    -o, --output FILE    Write to the specified file.
+    -C, --directory DIR  Change to the specified directory.
     -r, --remove-files   Remove files after archiving.
     -p, --progress       Display a progress bar.
+    -n, --dry-run        Print commands without executing them.
     -h, --help           Display this message.
 "
 }
 
-### command line #######################################################
+### functions ##########################################################
+
+error() {
+    echo "$prog: $*" >&2
+    exit 1
+}
 
 yesno() {
     local reply=
-    read -p "$prog: $*?" reply
+    read -p "$prog: $*? " reply
 
     case ${reply::1} in Y|y)
         return 0 ;;
@@ -43,20 +51,31 @@ yesno() {
     return 1
 }
 
-bad_option() {
-    echo "$prog: unrecognized option \`$1'" >&2
+bad_usage() {
+    echo "$prog: $*" >&2
     echo "Try \`$prog --help' for more information." >&2
     exit 1
+}
+
+bad_option() {
+    bad_usage "unrecognized option \`$1'"
 }
 
 missing_arg() {
-    echo "$prog: option \`$1' requires an argument" >&2
-    echo "Try \`$prog --help' for more information." >&2
-    exit 1
+    bad_usage "option \`$1' requires an argument"
 }
+
+pretty() {
+    echo "$*" | fmt | sed '1b;s/^/    /' | sed '$b;s/$/ \\/'
+}
+
+### command line #######################################################
 
 remove_files=false
 progress=false
+directory=
+output=
+dry_run=false
 
 while [ $# -gt 0 ]
 do
@@ -64,8 +83,11 @@ do
     shift
 
     case $option in
+        -o | --output) [ $# -gt 0 ] || missing_arg "$option" ; output="$1" ; shift ;;
+        -C | --directory) [ $# -gt 0 ] || missing_arg "$option" ; directory="$1" ; shift ;;
         -r | --remove-files) remove_files=true ;;
         -p | --progress) progress=true ;;
+        -n | --dry-run) dry_run=true ;;
         -h | --help) usage ; exit ;;
         --) break ;;
         -*) bad_option $option ;;
@@ -73,24 +95,59 @@ do
     esac
 done
 
+[ $# -gt 0 ] || bad_usage "no input files specified"
+
 ### main ###############################################################
 
-tar_opts=(--create --no-recursion)
+[ -z "$directory" ] || [ -d "$directory" ] ||
+    error "no such directory: \`$directory'"
+
+if [ -z "$output" ] ; then
+    output="$(basename $1)".tar.bz2
+fi
+
+find_opts=("$@" -depth -print0)
+
+tar_opts=(
+    --create
+    --no-recursion
+    --null
+    --bzip2
+    --files-from=-
+    --file=-
+)
 
 if $remove_files ; then
     tar_opts+=(--remove-files)
 fi
 
-for file ; do
-    archive="$file".tar.bz2
+if [ -n "$directory" ] ; then
+    tar_opts+=(--directory="$directory")
+fi
 
-    [ ! -f "$archive" ] || yesno "overwrite \`$archive'" || continue
+if $dry_run ; then
+    [ -z "$directory" ] || pretty "cd $directory"
+
+    pretty "find ${find_opts[@]} |"
+    pretty "tar ${tar_opts[@]}"
+
+    exit
+fi
+
+if [ -f "$output" ] ; then
+    yesno "overwrite \`$output'" || exit
+fi
+
+(
+    [ -z "$directory" ] || cd "$directory" >/dev/null
+
+    find "${find_opts[@]}" |
 
     if $progress ; then
-        find "$file" -depth -print0 | pv -ps $(find "$file" -printf '\n' | wc -l)
+        pv -ps $(find "$@" -printf '\n' | wc -l)
     else
-        find "$file" -depth -print0
+        cat
     fi |
-    xargs -0 tar "${tar_opts[@]}" |
-    bzip2 > "$archive"
-done
+
+    tar "${tar_opts[@]}"
+) > "$output"
