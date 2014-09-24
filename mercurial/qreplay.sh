@@ -77,7 +77,7 @@ fi
 qtop=$(hg qtop)
 
 for patch ; do
-    if [ "$(hg qtop)" != "$patch" ] ; then
+    if [ "$patch" != $(hg qtop) ] ; then
         hg qgoto --quiet "$patch" || exit $?
     fi
 
@@ -86,4 +86,4 @@ for patch ; do
     [ -z "$sleep" ] || sleep $sleep
 done
 
-[ "$(hg qtop)" = "$qtop" ] || hg qgoto --quiet "$qtop"
+[ $qtop = $(hg qtop) ] || hg qgoto --quiet "$qtop"
