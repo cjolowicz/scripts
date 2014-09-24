@@ -132,10 +132,8 @@ n=$#
 for patch ; do
     ((++i))
 
-    qtop=$(hg qtop)
-
-    if [ "$qtop" != "$patch" ] ; then
-        hg qgoto "$patch" || exit $?
+    if [ "$patch" != $(hg qtop) ] ; then
+        hg qgoto --quiet "$patch" || exit $?
     fi
 
     hg qrefresh -m"$(print_description)"
