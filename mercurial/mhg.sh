@@ -15,6 +15,7 @@ options:
     -k, --keep-going        Continue even if the command fails in a repository.
     -C, --cwd DIR           Change working directory.
     -R, --repository DIR    Include directory in the list of repositories.
+    -c, --config FILE       Specify a different configuration file.
     -h, --help              Display this message.
 
 The program reads $confdir/$prog.conf and \$HOME/.$prog if they exist.
@@ -91,6 +92,17 @@ do
     shift
 
     case $option in
+        -c | --config)
+            [ $# -gt 0 ] || missing_arg "$option"
+            configuration_file="$1"
+            shift
+            if ! [ -f $configuration_file ] && eval "$(parse_configuration_file "$configuration_file")" ; then
+                echo "cannot read \`$configuration_file'" >&2
+                exit 1
+            fi
+            set -- "${configuration_options[@]}" "$@"
+            ;;
+
         -C | --cwd) [ $# -gt 0 ] || missing_arg "$option" ; cwd="$1" ; shift ;;
         -R | --repository) [ $# -gt 0 ] || missing_arg "$option" ; repositories+=("$1") ; shift ;;
         -k | --keep-going) keep_going=true ;;
@@ -190,6 +202,12 @@ fi
 if [ -t 1 -a -x /usr/bin/tput ] ; then
     BEGIN="$(tput setf 2)"
     END="$(tput setf 7)"
+fi
+
+if [ -z "$hg_command" ] && ! $list ; then
+    echo "$prog: missing command" >&2
+    echo "Try \`$prog --help' for more information." >&2
+    exit 1
 fi
 
 error=0
