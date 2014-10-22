@@ -29,6 +29,7 @@ bad_usage () {
 
 ### command line #######################################################
 
+hg_options=()
 log_options=()
 merge_options=(-P)
 while [ $# -gt 0 ]
@@ -47,7 +48,12 @@ do
              --style         | \
              --template      | \
         -I | --include       | \
-        -X | --exclude       | \
+        -X | --exclude)
+            [ $# -gt 0 ] || bad_usage "option \`$option' requires an argument"
+            log_options+=("$option" "$1")
+            shift
+            ;;
+
         -R | --repository    | \
              --cwd           | \
              --config        | \
@@ -56,7 +62,7 @@ do
              --color         | \
              --pager)
             [ $# -gt 0 ] || bad_usage "option \`$option' requires an argument"
-            log_options+=("$option" "$1")
+            hg_options+=("$option" "$1")
             shift
             ;;
 
@@ -78,9 +84,9 @@ fi
 
 set -o pipefail
 
-revisions=($(hg merge "${merge_options[@]}" |
+revisions=($(hg "${hg_options[@]}" merge "${merge_options[@]}" |
              sed -n 's/^changeset:.*:/-r /p')) ||
     error "cannot determine changesets to be merged"
 
 [ ${#revisions[@]} -eq 0 ] ||
-    hg log "${log_options[@]}" "${revisions[@]}"
+    hg "${hg_options[@]}" log "${log_options[@]}" "${revisions[@]}"
