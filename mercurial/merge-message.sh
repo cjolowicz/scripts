@@ -28,12 +28,26 @@ bad_usage () {
 
 ### command line #######################################################
 
+hg_options=()
+
 while [ $# -gt 0 ]
 do
     option="$1"
     shift
 
     case $option in
+        -R | --repository    | \
+             --cwd           | \
+             --config        | \
+             --encoding      | \
+             --encodingmode  | \
+             --color         | \
+             --pager)
+            [ $# -gt 0 ] || bad_usage "option \`$option' requires an argument"
+            hg_options+=("$option" "$1")
+            shift
+            ;;
+
         -h | --help) usage ;;
         --) break ;;
         -*) bad_usage "unrecognized option \`$option'" ;;
@@ -48,10 +62,10 @@ done
 if [ $# -eq 0 ] ; then
     echo "Merge."
     echo
-    merge-preview --template ' * {desc|firstline} [{node|short}]\n'
+    merge-preview "${hg_options[@]}" --template ' * {desc|firstline} [{node|short}]\n'
 else
     echo "Merge $1 branch."
     echo
-    merge-preview --template ' * [{branch}/{node|short}] {desc|firstline}\n' "$1" |
+    merge-preview "${hg_options[@]}" --template ' * [{branch}/{node|short}] {desc|firstline}\n' "$1" |
     sed "s,\\[$1/,[,"
 fi
