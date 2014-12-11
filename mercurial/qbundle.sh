@@ -88,7 +88,7 @@ if $unbundle ; then
 elif [ -n "$logfile" ] ; then
     [ -z "$message" ] || bad_usage "--logfile and --message specified"
     message="$(cat "$logfile")"
-else
+elif ! $number ; then
     [ -n "$message" ] || bad_usage "no commit message specified"
 fi
 
@@ -99,7 +99,7 @@ print_suffix() {
 }
 
 _print_description() {
-    if ! $unbundle ; then
+    if [ -n "$message" ] ; then
         echo "$message"
         echo
     fi
@@ -132,7 +132,7 @@ n=$#
 for patch ; do
     ((++i))
 
-    if [ "$patch" != $(hg qtop) ] ; then
+    if ! qtop="$(hg qtop)" || [ "$patch" != "$qtop" ] ; then
         hg qgoto --quiet "$patch" || exit $?
     fi
 
