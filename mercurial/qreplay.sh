@@ -81,7 +81,7 @@ for patch ; do
         hg qgoto --quiet "$patch" || exit $?
     fi
 
-    ! $print || hg tip
+    ! $print || hg tip -v
 
     [ -z "$sleep" ] || sleep $sleep
 done
