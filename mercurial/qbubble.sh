@@ -15,11 +15,19 @@ options:
     -h, --help      Display this message.
 
 This program reverses the order of two patches { A B } using the
-following procedure:
+following procedure (simplified):
 
-    [1]  { A  B  C     }  where C  = -A      (reverse application of A)
-    [2]  { A  B  C  A' }  where A' = -C      (reverse application of C)
-    [3]  { B' A'       }  where B' = A + B + C          (fold of A B C)
+    [1] reverse application of A
+
+        { A B } => { A B -A }
+
+    [2] reverse application of -A
+
+        { A B -A } => { A B -A A' }
+
+    [3] fold
+
+        { A B -A A' } => { B' A' }
 
 The first step may require manual intervention."
 }
@@ -59,60 +67,57 @@ error() {
     exit 1
 }
 
+reverse() {
+    hg log -p -r $1 | patch -d "$hgroot" -p1 -R
+}
+
 start() {
     aname=$(hg qprev)
-    adesc="$(hg log -r $aname --template '{desc}')"
-
     bname=$(hg qtop)
-    bdesc="$(hg log -r $bname --template '{desc}')"
-
-    # reverse application of A
     cname=REVERSE-$aname
+    dname=TMP-$aname
 
-    hg qnew $cname
-
-    if ! hg log -p -r $aname | patch -d "$hgroot" -p1 -R ; then
+    hg qpop                # { A      | B }
+    hg qrefresh -X .       # { 0      | B } -- "0" is a zero patch with A's metainfo
+    hg qnew $dname         # { 0 A    | B }
+    hg qpop                # { 0      | A B }
+    hg qpop                # {        | 0 A B }
+    hg qpush --move $dname # { A      | 0 B }
+    hg qpush --move $bname # { A B    | 0 }
+    hg qnew $cname         # { A B -A | 0 }
+    reverse $dname ||
         error "resolve conflicts and qrefresh, \`$prog --continue' to resume."
-    fi
-
     hg qrefresh
 }
 
 resume() {
     aname=$(hg qapplied | tail -n2 | head -n1)
-    adesc="$(hg log -r $aname --template '{desc}')"
-
     bname=$(hg qprev)
-    bdesc="$(hg log -r $bname --template '{desc}')"
-
     cname=$(hg qtop)
+    dname=$(hg qnext)
+
+    [ "$cname" = REVERSE-$aname ] || error "unexpected patch \"$cname\""
+    [ "$dname" = TMP-$aname     ] || error "unexpected patch \"$dname\""
 }
 
 finish() {
-    # reverse application of C
-    dname=REVERSE-$cname
-
-    hg qnew $dname
-
-    if ! hg log -p -r $cname | patch -d "$hgroot" -p1 -R ; then
+    hg qpush    # { A B -A 0 }
+    reverse $cname ||
         error "cannot reverse $cname"
-    fi
-
-    hg qrefresh
-
-    # fold of A + B + C into B'
-    hg qgoto $aname
-    hg qfold $(hg qunapplied | head -n2)
-    hg qrename $bname
-    hg qrefresh -m"$bdesc"
-
-    # application of A'
-    hg qpush
-    hg qrename $aname
-    hg qrefresh -m"$adesc"
+    hg qrefresh # { A B -A A' }
+    hg qpop     # { A B -A | A' }
+    qfoldl      # { A B'   | A' }
+    qfoldr      # { B"     | A' }
+    hg qpush    # { B" A' }
 }
 
 ### main ###############################################################
+
+which qfoldl >/dev/null 2>&1 ||
+    error "qfoldl not found"
+
+which qfoldr >/dev/null 2>&1 ||
+    error "qfoldr not found"
 
 if $continue ; then
     resume
