@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set -o pipefail
 
 prog=$(basename $0)
 
@@ -13,6 +14,8 @@ Reverse the order of the two top-most patches.
 options:
     -c, --continue  Resume after conflict resolution.
     -A, --abort     Abort the operation.
+    -n, --dry-run   Print commands instead of executing them.
+    -v, --verbose   Be verbose.
     -h, --help      Display this message.
 
 This program reverses the order of two patches { A B } using the
@@ -38,75 +41,165 @@ error() {
     exit 1
 }
 
-bad_usage () {
+bad_usage() {
     echo "$prog: $*" >&2
     echo "Try \`$prog --help' for more information." >&2
     exit 1
 }
 
-bad_option () {
+bad_option() {
     bad_usage "unrecognized option \`$1'"
 }
 
+verbose() {
+    ! $verbose || echo "$prog: $*" >&2
+}
+
+for alias in qpush qpop qrefresh qnew qdelete qimport ; do
+    unalias $alias 2>/dev/null || true
+done
+
+qpush() {
+    if $dry_run ; then
+        $run hg qpush --quiet "$@"
+    else
+        hg qpush --quiet "$@" 2>&1 | (
+            grep -Ev '^(now at:|patch .* is empty)' || true
+        ) >&2
+    fi
+}
+
+qpop() {
+    if $dry_run ; then
+        $run hg qpop --quiet "$@"
+    else
+        hg qpop --quiet "$@" | (
+            grep -v '^now at:' || true
+        )
+    fi
+}
+
+qrefresh() {
+    $run hg qrefresh "$@"
+}
+
+qnew() {
+    $run hg qnew "$@"
+}
+
+qdelete() {
+    $run hg qdelete "$@"
+}
+
+qimport() {
+    if $dry_run ; then
+        $run hg qimport --quiet "$@"
+    else
+        hg qimport --quiet "$@" 2>&1 | (
+            grep -Ev '^(adding .* to series file)' || true
+        ) >&2
+    fi
+}
+
+qfoldl() {
+    if $dry_run ; then
+        command qfoldl --dry-run "$@"
+    else
+        command qfoldl "$@"
+    fi
+}
+
+qfoldr() {
+    if $dry_run ; then
+        command qfoldr --dry-run "$@"
+    else
+        command qfoldr "$@"
+    fi
+}
+
 reverse() {
-    hg log -p -r $1 | patch -d "$(hg root)" -p1 -R
+    if $dry_run ; then
+        $run hg diff --git --reverse --change $1 \|
+        qimport --quiet --git --name REVERSE-$1 -
+    else
+        hg diff --git --reverse --change $1 |
+        qimport --quiet --git --name REVERSE-$1 -
+    fi
+    qpush
 }
 
 start() {
-    aname=$(hg qprev)
-    bname=$(hg qtop)
-    cname=REVERSE-$aname
-    dname=TMP-$aname
+    a=$(hg qprev)
+    b=$(hg qtop)
+    acopy=COPY-$a
+    arev=REVERSE-$acopy
 
-    hg qpop                # { A       | B }
-    hg qrefresh -X .       # { 0       | B } -- "0" is a zero patch with A's metainfo
-    hg qnew $dname         # { 0 A'    | B }
-    hg qpop                # { 0       | A' B }
-    hg qpop                # {         | 0 A' B }
-    hg qpush --move $dname # { A'      | 0 B }
-    hg qpush --move $bname # { A' B    | 0 }
-    hg qnew $cname         # { A' B -A | 0 }
-    reverse $dname ||
-        error "resolve conflicts and qrefresh, \`$prog --continue' to resume, \`$prog --abort' to abort."
-    hg qrefresh
+    verbose "preparing..."
+
+    qpop                 # { A       | B }
+    qrefresh --exclude . # { 0       | B } -- "0" is a zero patch with A's metainfo
+    qnew $acopy          # { 0 A'    | B }
+    qpop                 # { 0       | A' B }
+    qpop                 # {         | 0 A' B }
+    qpush --move $acopy  # { A'      | 0 B }
+    qpush --move $b      # { A' B    | 0 }
+
+    verbose "reverse \`$a'"
+
+    reverse $acopy ||    # { A' B -A | 0 }
+        error "resolve conflicts and qrefresh, \`$prog --continue' to resume."
 }
 
 resume() {
-    aname=$(hg qnext)
-    bname=$(hg qprev)
-    cname=$(hg qtop)
-    dname=$(hg qapplied | tail -n3 | head -n1)
+    a=$(hg qnext)
+    b=$(hg qprev)
+    acopy=$(hg qapplied | tail -n3 | head -n1)
+    arev=$(hg qtop)
 
-    [ "$cname" = REVERSE-$aname ] || error "unexpected patch \"$cname\", expected REVERSE-$aname"
-    [ "$dname" = TMP-$aname     ] || error "unexpected patch \"$dname\", expected TMP-$aname"
+    [ "$acopy" = COPY-$a        ] || error "unexpected patch \"$acopy\", expected COPY-$a"
+    [ "$arev"  = REVERSE-$acopy ] || error "unexpected patch \"$arev\", expected REVERSE-$acopy"
 }
 
 abort() {
-    hg qpop
-    hg qpop
-    hg qpop
-    hg qpush --move $aname
-    hg qpush --move $dname
-    qfoldl
-    hg qpush --move $bname
-    hg qdelete $cname
+    verbose "cleaning up..."
+
+    qpop            # { A' B | -A 0 }
+    qpop            # { A'   | B -A 0 }
+    qpop            # {      | A' B -A 0 }
+    qpush --move $a # { 0    | A' B -A }
+    qpush           # { 0 A' | B -A }
+    qfoldl          # { A    | B -A }
+    qpush           # { A B  | -A }
+    qdelete $arev   # { A B }
+
+    verbose "done."
 }
 
 finish() {
-    hg qpush    # { A' B -A 0 }
-    reverse $cname ||
-        error "cannot reverse $cname"
-    hg qrefresh # { A' B -A A" }
-    hg qpop     # { A' B -A | A" }
-    qfoldl      # { A' B'   | A" }
-    qfoldr      # { B"      | A" }
-    hg qpush    # { B" A" }
+    verbose "reverse-reverse \`$a'"
+
+    qpush            # { A' B -A 0 }
+    reverse $arev || # { A' B -A 0 --A }
+        error "cannot reverse $arev"
+
+    qfoldl # { A' B -A A" }
+    qpop   # { A' B -A | A" }
+
+    verbose "fold into \`$b'"
+
+    qfoldl # { A' B'   | A" }
+    qfoldr # { B"      | A" }
+    qpush  # { B" A" }
+
+    verbose "done."
 }
 
 ### command line #######################################################
 
 continue=false
 abort=false
+verbose=false
+dry_run=false
 
 while [ $# -gt 0 ]
 do
@@ -116,6 +209,8 @@ do
     case $option in
         -c | --continue) continue=true ;;
         -A | --abort) abort=true ;;
+        -n | --dry-run) dry_run=true ;;
+        -v | --verbose) verbose=true ;;
         -h | --help) usage ; exit ;;
         --) break ;;
         -*) bad_option $option ;;
@@ -127,6 +222,10 @@ done
 
 ! $abort || ! $continue ||
     bad_usage "specified both --abort and --continue"
+
+if $dry_run ; then
+    run=echo
+fi
 
 ### main ###############################################################
 
