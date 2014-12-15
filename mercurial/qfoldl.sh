@@ -13,6 +13,7 @@ Fold the two top-most patches { A B } into A.
 
 options:
     -n, --dry-run   Print commands instead of executing them.
+    -v, --verbose   Be verbose.
     -h, --help      Display this message.
 
 This program performs a fold of two patches { A B } using the
@@ -38,7 +39,14 @@ bad_option () {
     exit 1
 }
 
-for alias in qpop ; do
+verbose() {
+    local level=$1
+    shift
+
+    [ $verbose -lt $level ] || echo "$prog: $*" >&2
+}
+
+for alias in qpop qrefresh qfold ; do
     unalias $alias 2>/dev/null || true
 done
 
@@ -46,15 +54,35 @@ qpop() {
     if $dry_run ; then
         $run hg qpop --quiet "$@"
     else
-        hg qpop --quiet "$@" | (
-	    grep -v '^now at:' || true
+        verbose 2 hg qpop --quiet "$@"
+        $run hg qpop --quiet "$@" | (
+            grep -Ev '^(now at:|patch queue now empty)' || true
 	)
+    fi
+}
+
+qrefresh() {
+    if $dry_run ; then
+        $run hg qrefresh "$@"
+    else
+        verbose 2 hg qrefresh "$@"
+        $run hg qrefresh "$@"
+    fi
+}
+
+qfold() {
+    if $dry_run ; then
+        $run hg qfold "$@"
+    else
+        verbose 2 hg qfold "$@"
+        $run hg qfold "$@"
     fi
 }
 
 ### command line #######################################################
 
 dry_run=false
+verbose=0
 
 while [ $# -gt 0 ]
 do
@@ -63,6 +91,7 @@ do
 
     case $option in
         -n | --dry-run) dry_run=true ;;
+        -v | --verbose) ((++verbose)) ;;
         -h | --help) usage ; exit ;;
         --) break ;;
         -*) bad_option $option ;;
@@ -81,6 +110,6 @@ fi
 aname=$(hg qprev)
 bname=$(hg qtop)
 
-$run hg qrefresh --message= # FIXME: this has no effect
+qrefresh --message= # FIXME: this has no effect
 qpop
-$run hg qfold $bname
+qfold $bname
