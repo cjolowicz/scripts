@@ -1,53 +1,134 @@
 #!/bin/bash
 
+set -e
+set -o pipefail
+
 prog=$(basename $0)
 
-### usage ##############################################################
+### functions ##########################################################
 
-usage () {
-    echo "usage: $prog [options]
+usage() {
+    echo "\
+usage: $prog [options] [patch]..
+       $prog [options] --applied
+Update the patch description.
 
 options:
-    -p, --prepend TEXT    Prepend text to the description.
-    -a, --append TEXT     Append text to the description.
-    -h, --help            Display this message.
+    -m, --message TEXT  Specify message instead of reading from stdin.
+    -a, --applied       Rewrite all applied patches.
+        --cwd DIR       Change working directory.
+    -p, --prepend       Prepend text to the description.
+    -A, --append        Append text to the description.
+    -n, --dry-run       Print commands instead of executing them.
+    -h, --help          Display this message.
 "
     exit
 }
 
-error () {
+error() {
     echo "$prog: error: $*" >&2
     exit 1
 }
 
-bad_usage () {
+bad_usage() {
     echo "$prog: $*" >&2
     echo "Try \`$prog --help' for more information." >&2
     exit 1
 }
 
+missing_arg() {
+    bad_usage "option \`$1' requires an argument"
+}
+
+for alias in qpop qgoto ; do
+    unalias $alias 2>/dev/null || true
+done
+
+qpop() {
+    if $dry_run ; then
+        $run hg qpop --quiet "$@"
+    else
+        $run hg qpop --quiet "$@" | (
+            grep -v '^now at:' || true
+        )
+    fi
+}
+
+qgoto() {
+    if $dry_run ; then
+        $run hg qgoto --quiet "$@"
+    else
+        $run hg qgoto --quiet "$@" 2>&1 | (
+            grep -Ev '^(now at:|patch .* is empty|.* is already at the top)' || true
+        ) >&2
+    fi
+}
+
+read_desc() {
+    local name="$1"
+
+    hg log --rev "\"$name\"" --template '{desc}'
+}
+
+rewrite() {
+    local name="$1"
+    local desc=
+
+    $dry_run || echo "$name" >&2
+
+    qgoto "$name"
+
+    if $prepend ; then
+        desc="\
+$message
+
+$(read_desc $name)"
+    elif $append ; then
+        desc="\
+$(read_desc $name)
+
+$message"
+    else
+        desc="$message"
+    fi
+
+    if $dry_run ; then
+        $run hg qrefresh --message="\"$desc\""
+    else
+        $run hg qrefresh --message="$desc"
+    fi
+}
+
 ### command line #######################################################
 
-append=()
-prepend=()
+message=
+cwd=
+applied=false
+dry_run=false
+append=false
+prepend=false
 while [ $# -gt 0 ]
 do
     option="$1"
     shift
 
     case $option in
-        -p | --prepend)
-            [ $# -gt 0 ] || bad_usage "option \`$option' requires an argument"
-            prepend+=("$1")
+        -m | --message)
+            [ $# -gt 0 ] || missing_arg "$option"
+            message="$1"
             shift
             ;;
 
-        -a | --append)
-            [ $# -gt 0 ] || bad_usage "option \`$option' requires an argument"
-            append+=("$1")
+        --cwd)
+            [ $# -gt 0 ] || missing_arg "$option"
+            cwd="$1"
             shift
             ;;
 
+        -p | --prepend) prepend=true ;;
+        -A | --append) append=true ;;
+        -a | --applied) applied=true ;;
+        -n | --dry-run) dry_run=true ;;
         -h | --help) usage ;;
         --) break ;;
         -*) bad_usage "unrecognized option \`$option'" ;;
@@ -55,31 +136,48 @@ do
     esac
 done
 
-[ $# -eq 0 ] ||
-    bad_usage "unknown argument \`$1'"
+if $dry_run ; then
+    run=echo
+fi
 
-[ "${#prepend[@]}" -gt 0 -o "${#append[@]}" -gt 0 ] ||
-    bad_usage "option \`--prepend' or \`--append' is required"
+if ! $applied ; then
+    [ $# -gt 0 ] || bad_usage "missing argument"
+else
+    [ $# -eq 0 ] || bad_usage "unexpected argument \`$1'"
+    set -- $(hg qapplied)
+fi
+
+if $prepend && $append ; then
+    bad_usage "both \`--prepend' and \`--append' specified"
+fi
+
+if [ -z "$message" ] ; then
+    message="$(cat)"
+fi
 
 ### main ###############################################################
 
-desc="$(hg tip --template '{desc}')" ||
-    error "cannot read current description"
+if [ -n "$cwd" ] ; then
+    if $dry_run ; then
+        $run cd "$cwd"
+    fi
 
-if [ "${#prepend[@]}" -gt 0 ] ; then
-    for line in "${prepend[@]}" ; do
-        desc="$line
-
-$desc"
-    done
+    cd "$cwd"
 fi
 
-if [ "${#append[@]}" -gt 0 ] ; then
-    for line in "${append[@]}" ; do
-        desc="$desc
+hg root >/dev/null || error "no repository"
+hg root --mq >/dev/null || error "no patch repository"
 
-$line"
-    done
+oldtop="$(hg qtop)" 2>/dev/null
+
+for patch ; do
+    rewrite "$patch"
+done
+
+if ! $dry_run ; then
+    if [ -n "$oldtop" ] ; then
+	qgoto "$oldtop"
+    else
+	qpop --all
+    fi
 fi
-
-hg qrefresh -m "$desc"
