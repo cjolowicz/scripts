@@ -13,6 +13,7 @@ Fold the two top-most patches { A B } into B.
 
 options:
     -n, --dry-run   Print commands instead of executing them.
+    -v, --verbose   Be verbose.
     -h, --help      Display this message.
 
 This program performs a fold of two patches { A B } using the
@@ -43,7 +44,14 @@ bad_option() {
     exit 1
 }
 
-for alias in qpush qpop qgoto ; do
+verbose() {
+    local level=$1
+    shift
+
+    [ $verbose -lt $level ] || echo "$prog: $*" >&2
+}
+
+for alias in qpush qpop qgoto qrefresh qfold qnew ; do
     unalias $alias 2>/dev/null || true
 done
 
@@ -51,7 +59,8 @@ qpush() {
     if $dry_run ; then
         $run hg qpush --quiet "$@"
     else
-        hg qpush --quiet "$@" 2>&1 | (
+        verbose 2 hg qpush --quiet "$@"
+        $run hg qpush --quiet "$@" 2>&1 | (
             grep -Ev '^(now at:|patch .* is empty)' || true
 	) >&2
     fi
@@ -61,8 +70,9 @@ qpop() {
     if $dry_run ; then
         $run hg qpop --quiet "$@"
     else
-        hg qpop --quiet "$@" | (
-	    grep -v '^now at:' || true
+        verbose 2 hg qpop --quiet "$@"
+        $run hg qpop --quiet "$@" | (
+            grep -Ev '^(now at:|patch queue now empty)' || true
 	)
     fi
 }
@@ -71,15 +81,44 @@ qgoto() {
     if $dry_run ; then
         $run hg qgoto --quiet "$@"
     else
-        hg qgoto --quiet "$@" 2>&1 | (
+        verbose 2 hg qgoto --quiet "$@"
+        $run hg qgoto --quiet "$@" 2>&1 | (
             grep -Ev '^(now at:|patch .* is empty)' || true
 	) >&2
+    fi
+}
+
+qrefresh() {
+    if $dry_run ; then
+        $run hg qrefresh "$@"
+    else
+        verbose 2 hg qrefresh "$@"
+        $run hg qrefresh "$@"
+    fi
+}
+
+qfold() {
+    if $dry_run ; then
+        $run hg qfold "$@"
+    else
+        verbose 2 hg qfold "$@"
+        $run hg qfold "$@"
+    fi
+}
+
+qnew() {
+    if $dry_run ; then
+        $run hg qnew "$@"
+    else
+        verbose 2 hg qnew "$@"
+        $run hg qnew "$@"
     fi
 }
 
 ### command line #######################################################
 
 dry_run=false
+verbose=0
 
 while [ $# -gt 0 ]
 do
@@ -88,6 +127,7 @@ do
 
     case $option in
         -n | --dry-run) dry_run=true ;;
+        -v | --verbose) ((++verbose)) ;;
         -h | --help) usage ; exit ;;
         --) break ;;
         -*) bad_option $option ;;
@@ -107,10 +147,10 @@ aname=$(hg qprev)
 bname=$(hg qtop)
 cname=TMP-$bname
 
-$run hg qrefresh --exclude .
-$run hg qnew $cname
+qrefresh --exclude .
+qnew $cname
 qgoto $aname
-$run hg qrefresh --message= # FIXME: this has no effect
+qrefresh --message= # FIXME: this has no effect
 qpop
 qpush --move $bname
-$run hg qfold $aname $cname
+qfold $aname $cname
