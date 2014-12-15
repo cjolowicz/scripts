@@ -15,6 +15,7 @@ options:
     -a, --applied    Replay all applied patches.
         --cwd DIR    Change working directory.
     -s, --sleep N    Sleep N seconds after each push.
+    -r, --refresh    Refresh each patch.
     -p, --print      Print each patch.
     -h, --help       Display this message.
 "
@@ -46,6 +47,7 @@ sleep=
 cwd=
 applied=false
 print=false
+refresh=false
 while [ $# -gt 0 ]
 do
     option="$1"
@@ -55,6 +57,7 @@ do
         --cwd) [ $# -gt 0 ] || missing_arg "$option" ; cwd="$1" ; shift ;;
         -a | --applied) applied=true ;;
         -p | --print) print=true ;;
+        -r | --refresh) refresh=true ;;
         -s | --sleep) [ $# -gt 0 ] || missing_arg "$option" ; sleep="$1" ; shift ;;
         -h | --help) usage ;;
         --) break ;;
@@ -85,12 +88,13 @@ for patch ; do
     hg qgoto --quiet "$patch" || exit $?
 
     ! $print || hg tip
+    ! $refresh || hg qrefresh
 
     [ -z "$sleep" ] || sleep $sleep
 done
 
 if [ -n "$qtop" ] ; then
-    qgoto "$qtop"
+    hg qgoto --quiet "$qtop"
 else
-    qpop --all
+    hg qpop --quiet --all
 fi
