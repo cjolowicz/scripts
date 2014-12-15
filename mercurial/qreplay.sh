@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 prog=$(basename $0)
 
 ### usage ##############################################################
@@ -74,16 +76,21 @@ fi
 
 ### main ###############################################################
 
-qtop=$(hg qtop)
+hg root >/dev/null || error "no repository"
+hg root --mq >/dev/null || error "no patch repository"
+
+qtop="$(hg qtop)" 2>/dev/null
 
 for patch ; do
-    if [ "$patch" != $(hg qtop) ] ; then
-        hg qgoto --quiet "$patch" || exit $?
-    fi
+    hg qgoto --quiet "$patch" || exit $?
 
-    ! $print || hg tip -v
+    ! $print || hg tip
 
     [ -z "$sleep" ] || sleep $sleep
 done
 
-[ $qtop = $(hg qtop) ] || hg qgoto --quiet "$qtop"
+if [ -n "$qtop" ] ; then
+    qgoto "$qtop"
+else
+    qpop --all
+fi
