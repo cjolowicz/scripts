@@ -143,11 +143,14 @@ fi
 
 ### main ###############################################################
 
+hgroot=$(hg root) ||
+    error "no repository"
+
 aname=$(hg qprev)
 bname=$(hg qtop)
 cname=TMP-$bname
 
-qrefresh --exclude .
+qrefresh --exclude "$hgroot"
 qnew $cname
 qgoto $aname
 qrefresh --message= # FIXME: this has no effect
