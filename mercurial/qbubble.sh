@@ -52,7 +52,10 @@ bad_option() {
 }
 
 verbose() {
-    ! $verbose || echo "$prog: $*" >&2
+    local level=$1
+    shift
+
+    [ $verbose -lt $level ] || echo "$prog: $*" >&2
 }
 
 for alias in qpush qpop qrefresh qnew qdelete qimport ; do
@@ -63,7 +66,8 @@ qpush() {
     if $dry_run ; then
         $run hg qpush --quiet "$@"
     else
-        hg qpush --quiet "$@" 2>&1 | (
+        verbose 2 hg qpush --quiet "$@"
+        $run hg qpush --quiet "$@" 2>&1 | (
             grep -Ev '^(now at:|patch .* is empty)' || true
         ) >&2
     fi
@@ -73,48 +77,57 @@ qpop() {
     if $dry_run ; then
         $run hg qpop --quiet "$@"
     else
-        hg qpop --quiet "$@" | (
-            grep -v '^now at:' || true
+        verbose 2 hg qpop --quiet "$@"
+        $run hg qpop --quiet "$@" | (
+            grep -Ev '^(now at:|patch queue now empty)' || true
         )
     fi
 }
 
 qrefresh() {
-    $run hg qrefresh "$@"
+    if $dry_run ; then
+        $run hg qrefresh "$@"
+    else
+        verbose 2 hg qrefresh "$@"
+        $run hg qrefresh "$@"
+    fi
 }
 
 qnew() {
-    $run hg qnew "$@"
+    if $dry_run ; then
+        $run hg qnew "$@"
+    else
+        verbose 2 hg qnew "$@"
+        $run hg qnew "$@"
+    fi
 }
 
 qdelete() {
-    $run hg qdelete "$@"
+    if $dry_run ; then
+        $run hg qdelete "$@"
+    else
+        verbose 2 hg qdelete "$@"
+        $run hg qdelete "$@"
+    fi
 }
 
 qimport() {
     if $dry_run ; then
         $run hg qimport --quiet "$@"
     else
-        hg qimport --quiet "$@" 2>&1 | (
+        verbose 2 hg qimport --quiet "$@"
+        $run hg qimport --quiet "$@" 2>&1 | (
             grep -Ev '^(adding .* to series file)' || true
         ) >&2
     fi
 }
 
 qfoldl() {
-    if $dry_run ; then
-        command qfoldl --dry-run "$@"
-    else
-        command qfoldl "$@"
-    fi
+    command qfoldl "${options[@]}" "$@"
 }
 
 qfoldr() {
-    if $dry_run ; then
-        command qfoldr --dry-run "$@"
-    else
-        command qfoldr "$@"
-    fi
+    command qfoldr "${options[@]}" "$@"
 }
 
 reverse() {
@@ -122,6 +135,7 @@ reverse() {
         $run hg diff --git --reverse --change $1 \|
         qimport --quiet --git --name REVERSE-$1 -
     else
+        verbose 2 hg diff --git --reverse --change $1 \|
         hg diff --git --reverse --change $1 |
         qimport --quiet --git --name REVERSE-$1 -
     fi
@@ -134,19 +148,19 @@ start() {
     acopy=COPY-$a
     arev=REVERSE-$acopy
 
-    verbose "preparing..."
+    verbose 1 "preparing..."
 
-    qpop                 # { A       | B }
-    qrefresh --exclude . # { 0       | B } -- "0" is a zero patch with A's metainfo
-    qnew $acopy          # { 0 A'    | B }
-    qpop                 # { 0       | A' B }
-    qpop                 # {         | 0 A' B }
-    qpush --move $acopy  # { A'      | 0 B }
-    qpush --move $b      # { A' B    | 0 }
+    qpop                         # { A       | B }
+    qrefresh --exclude "$hgroot" # { 0       | B } -- "0" is a zero patch with A's metainfo
+    qnew $acopy                  # { 0 A'    | B }
+    qpop                         # { 0       | A' B }
+    qpop                         # {         | 0 A' B }
+    qpush --move $acopy          # { A'      | 0 B }
+    qpush --move $b              # { A' B    | 0 }
 
-    verbose "reverse \`$a'"
+    verbose 1 "reverse \`$a'"
 
-    reverse $acopy ||    # { A' B -A | 0 }
+    reverse $acopy ||            # { A' B -A | 0 }
         error "resolve conflicts and qrefresh, \`$prog --continue' to resume."
 }
 
@@ -161,7 +175,7 @@ resume() {
 }
 
 abort() {
-    verbose "cleaning up..."
+    verbose 1 "cleaning up..."
 
     qpop            # { A' B | -A 0 }
     qpop            # { A'   | B -A 0 }
@@ -172,11 +186,11 @@ abort() {
     qpush           # { A B  | -A }
     qdelete $arev   # { A B }
 
-    verbose "done."
+    verbose 1 "done."
 }
 
 finish() {
-    verbose "reverse-reverse \`$a'"
+    verbose 1 "reverse-reverse \`$a'"
 
     qpush            # { A' B -A 0 }
     reverse $arev || # { A' B -A 0 --A }
@@ -185,20 +199,21 @@ finish() {
     qfoldl # { A' B -A A" }
     qpop   # { A' B -A | A" }
 
-    verbose "fold into \`$b'"
+    verbose 1 "fold into \`$b'"
 
     qfoldl # { A' B'   | A" }
     qfoldr # { B"      | A" }
     qpush  # { B" A" }
 
-    verbose "done."
+    verbose 1 "done."
 }
 
 ### command line #######################################################
 
+options=()
 continue=false
 abort=false
-verbose=false
+verbose=0
 dry_run=false
 
 while [ $# -gt 0 ]
@@ -209,8 +224,8 @@ do
     case $option in
         -c | --continue) continue=true ;;
         -A | --abort) abort=true ;;
-        -n | --dry-run) dry_run=true ;;
-        -v | --verbose) verbose=true ;;
+        -n | --dry-run) dry_run=true ; options+=(--dry-run) ;;
+        -v | --verbose) ((++verbose)) ; options+=(--verbose) ;;
         -h | --help) usage ; exit ;;
         --) break ;;
         -*) bad_option $option ;;
@@ -228,6 +243,9 @@ if $dry_run ; then
 fi
 
 ### main ###############################################################
+
+hgroot=$(hg root) ||
+    error "no repository"
 
 which qfoldl >/dev/null 2>&1 ||
     error "qfoldl not found"
