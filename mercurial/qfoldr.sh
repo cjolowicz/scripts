@@ -156,4 +156,5 @@ qgoto $aname
 qrefresh --message= # FIXME: this has no effect
 qpop
 qpush --move $bname
-qfold $aname $cname
+qfold $aname
+qfold $cname
