@@ -14,6 +14,7 @@ Reverse the order of the two top-most patches.
 options:
     -c, --continue  Resume after conflict resolution.
     -A, --abort     Abort the operation.
+        --left      Inverse procedure (see below).
     -n, --dry-run   Print commands instead of executing them.
     -v, --verbose   Be verbose.
     -h, --help      Display this message.
@@ -33,7 +34,32 @@ following procedure (simplified):
 
         { A B -A A' } => { B' A' }
 
-The first step may require manual intervention."
+Step [1] may require manual intervention.
+
+When --left is specified, the following procedure is used instead:
+
+    [1] de-application of A and B
+
+        { A B } => { }
+
+    [2] application of B
+
+        { } => { B' }
+
+    [3] reverse application of B
+
+        { B' } => { B' -B' }
+
+    [4] application of A and B
+
+        { B' -B' } => { B' -B' A B }
+
+    [5] fold
+
+        { B' -B' A B } => { B' A' }
+
+Step [2] may require manual intervention.
+"
 }
 
 error() {
@@ -142,13 +168,24 @@ reverse() {
     qpush
 }
 
-start() {
+duplicate() {
+    if $dry_run ; then
+        $run hg diff --git --change $1 \|
+        qimport --quiet --git --name COPY-$1 -
+    else
+        verbose 2 hg diff --git --change $1 \|
+        hg diff --git --change $1 |
+        qimport --quiet --git --name COPY-$1 -
+    fi
+}
+
+start_right() {
     a=$(hg qprev)
     b=$(hg qtop)
     acopy=COPY-$a
     arev=REVERSE-$acopy
 
-    verbose 1 "preparing..."
+    verbose 1 "Preparing..."
 
     qpop                         # { A       | B }
     qrefresh --exclude "$hgroot" # { 0       | B } -- "0" is a zero patch with A's metainfo
@@ -158,13 +195,13 @@ start() {
     qpush --move $acopy          # { A'      | 0 B }
     qpush --move $b              # { A' B    | 0 }
 
-    verbose 1 "reverse \`$a'"
+    verbose 1 "Reverse \`$a'"
 
     reverse $acopy ||            # { A' B -A | 0 }
         error "resolve conflicts and qrefresh, \`$prog --continue' to resume."
 }
 
-resume() {
+resume_right() {
     a=$(hg qnext)
     b=$(hg qprev)
     acopy=$(hg qapplied | tail -n3 | head -n1)
@@ -174,8 +211,8 @@ resume() {
     [ "$arev"  = REVERSE-$acopy ] || error "unexpected patch \"$arev\", expected REVERSE-$acopy"
 }
 
-abort() {
-    verbose 1 "cleaning up..."
+abort_right() {
+    verbose 1 "Cleaning up..."
 
     qpop            # { A' B | -A 0 }
     qpop            # { A'   | B -A 0 }
@@ -186,11 +223,11 @@ abort() {
     qpush           # { A B  | -A }
     qdelete $arev   # { A B }
 
-    verbose 1 "done."
+    verbose 1 "Done."
 }
 
-finish() {
-    verbose 1 "reverse-reverse \`$a'"
+finish_right() {
+    verbose 1 "Reverse-reverse \`$a'"
 
     qpush            # { A' B -A 0 }
     reverse $arev || # { A' B -A 0 --A }
@@ -199,13 +236,86 @@ finish() {
     qfoldl # { A' B -A A" }
     qpop   # { A' B -A | A" }
 
-    verbose 1 "fold into \`$b'"
+    verbose 1 "Fold into \`$b'"
 
     qfoldl # { A' B'   | A" }
     qfoldr # { B"      | A" }
     qpush  # { B" A" }
 
-    verbose 1 "done."
+    verbose 1 "Done."
+}
+
+start_left() {
+    a=$(hg qprev)
+    b=$(hg qtop)
+    bcopy=COPY-$b
+
+    verbose 1 "Preparing..."
+
+    duplicate $b                 # { A B         | B' }
+    qpop                         # { A           | B B' }
+    qpop                         # {             | A B B' }
+
+    verbose 1 "Apply \`$b'"
+
+    qpush --move $b ||           # { B"          | A B' }
+        error "resolve conflicts and qrefresh, \`$prog --continue' to resume."
+}
+
+resume_left() {
+    a=$(hg qnext)
+    b=$(hg qtop)
+    bcopy=$(hg qunapplied | head -n2 | tail -n1)
+
+    [ "$bcopy" = COPY-$b ] || error "unexpected patch \"$bcopy\", expected COPY-$b"
+}
+
+abort_left() {
+    verbose 1 "Cleaning up..."
+
+    qrefresh --exclude "$hgroot"
+    hg revert --all # { 0      | A B' }
+    qpop            # {        | 0 A B' }
+    qpush --move $a # { A      | 0 B' }
+    qpush           # { A 0    | B' }
+    qpush           # { A 0 B' }
+    qfoldl          # { A B }
+
+    verbose 1 "Done."
+}
+
+finish_left() {
+    verbose 1 "Reverse \`$b'"
+
+    reverse $b # { B" -B"      | A B' }
+
+    verbose 1 "Apply original patches."
+
+    qpush      # { B" -B" A    | B' }
+    qpush      # { B" -B" A B' }
+
+    verbose 1 "Fold into \`$a'"
+
+    qfoldl     # { B" -B" A' }
+    qfoldr     # { B" A" }
+
+    verbose 1 "Done."
+}
+
+start() {
+    $left && start_left || start_right
+}
+
+resume() {
+    $left && resume_left || resume_right
+}
+
+abort() {
+    $left && abort_left || abort_right
+}
+
+finish() {
+    $left && finish_left || finish_right
 }
 
 ### command line #######################################################
@@ -213,6 +323,7 @@ finish() {
 options=()
 continue=false
 abort=false
+left=false
 verbose=0
 dry_run=false
 
@@ -225,6 +336,7 @@ do
         -c | --continue) continue=true ;;
         -A | --abort) abort=true ;;
         -n | --dry-run) dry_run=true ; options+=(--dry-run) ;;
+        --left) left=true ;;
         -v | --verbose) ((++verbose)) ; options+=(--verbose) ;;
         -h | --help) usage ; exit ;;
         --) break ;;
