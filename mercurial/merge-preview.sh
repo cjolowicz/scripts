@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -o pipefail
+
 prog=$(basename $0)
 
 ### functions ##########################################################
@@ -32,6 +34,7 @@ bad_usage () {
 hg_options=()
 log_options=()
 merge_options=(-P)
+
 while [ $# -gt 0 ]
 do
     option="$1"
@@ -81,8 +84,6 @@ fi
 [ $# -eq 0 ] || bad_usage "unknown argument \`$1'"
 
 ### main ###############################################################
-
-set -o pipefail
 
 revisions=($(hg "${hg_options[@]}" merge "${merge_options[@]}" |
              sed -n 's/^changeset:.*:/-r /p')) ||
