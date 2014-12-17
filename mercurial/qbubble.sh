@@ -259,7 +259,7 @@ start_left() {
     verbose 1 "Apply \`$b'"
 
     qpush --move $b ||           # { B"          | A B' }
-        error "resolve conflicts and qrefresh, \`$prog --continue' to resume."
+        error "resolve conflicts and qrefresh, \`$prog --left --continue' to resume."
 }
 
 resume_left() {
