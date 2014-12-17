@@ -42,41 +42,58 @@ verbose() {
     [ $verbose -lt $level ] || echo "$prog: $*" >&2
 }
 
-logfile() {
-    echo "$tmpdir/$prog-$local-$other.tmp"
+print_commit_message() {
+    local revisions=($(
+        hg merge --preview "$branch" |
+        sed -n 's/^changeset:.*:/-r /p'
+    ))
+
+    [ ${#revisions[@]} -gt 0 ] ||
+        error "cannot determine changesets to be merged"
+
+    echo "Merge $branch branch."
+    echo
+
+    hg log --template ' * [{branch}/{node|short}] {desc|firstline}\n' "${revisions[@]}" |
+    sed "s,\\[$branch/,[,"
+}
+
+save_commit_message() {
+    if $dry_run ; then
+        $run cat "<<EOF > $logfile"
+        print_commit_message
+        $run 'EOF'
+    else
+        print_commit_message > "$logfile"
+    fi
 }
 
 start() {
-    local=$(hg parent --template '{node|short}')
-    other=$(hg log --rev "$branch" --template '{node|short}')
+    save_commit_message
 
-    $run merge-message --output "$(logfile)" "$branch"
     $run hg merge "$branch" ||
         error "resolve conflicts, \`$prog --continue' to resume."
 }
 
 resume() {
-    local=$(hg parent --template '{node|short}\n' | sed -n 1p)
-    other=$(hg parent --template '{node|short}\n' | sed -n 2p)
+    local parent=$(hg parent --template '{node|short}\n' | sed -n 2p)
 
-    [ -n "$other" ] ||
+    [ -n "$parent" ] ||
         error "working directory does not have two parents"
 
-    local rev=$(hg log --rev "$branch" --template '{node|short}')
-
-    [ "$other" = "$rev" ] ||
-        error "unexpected revision for $branch: $other"
+    [ "$parent" = "$other" ] ||
+        error "unexpected parent \`$parent'"
 }
 
 finish() {
-    $run hg commit --logfile "$(logfile)"
-    $run rm -f "$(logfile)"
+    $run hg commit --logfile "$logfile"
+    $run rm -f "$logfile"
     $run hg tip --verbose
 }
 
 abort() {
     $run hg update --clean
-    $run rm -f "$(logfile)"
+    $run rm -f "$logfile"
 }
 
 ### command line #######################################################
@@ -120,10 +137,12 @@ fi
 
 ### main ###############################################################
 
-which merge-message >/dev/null 2>&1 ||
-    error "merge-message not found"
-
 tmpdir="${TMPDIR:-/tmp}"
+
+local=$(hg parent --template '{node|short}\n' | sed -n 1p)
+other=$(hg log --rev "$branch" --template '{node|short}')
+
+logfile="$tmpdir/$prog-$local-$other.tmp"
 
 if $abort ; then
     resume
