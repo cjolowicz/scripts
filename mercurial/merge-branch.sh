@@ -58,6 +58,14 @@ start() {
 resume() {
     local=$(hg parent --template '{node|short}\n' | sed -n 1p)
     other=$(hg parent --template '{node|short}\n' | sed -n 2p)
+
+    [ -n "$other" ] ||
+        error "working directory does not have two parents"
+
+    local rev=$(hg log --rev "$branch" --template '{node|short}')
+
+    [ "$other" = "$rev" ] ||
+        error "unexpected revision for $branch: $other"
 }
 
 finish() {
