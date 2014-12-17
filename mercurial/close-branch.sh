@@ -10,7 +10,7 @@ prog=$(basename $0)
 usage() {
     echo "\
 usage: $prog [options] [branch]..
-usage: $prog [options] --inactive
+usage: $prog [options] --all
 
 Close the specified branches.
 
