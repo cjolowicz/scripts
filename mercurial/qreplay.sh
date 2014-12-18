@@ -17,6 +17,7 @@ options:
     -s, --sleep N    Sleep N seconds after each push.
     -r, --refresh    Refresh each patch.
     -p, --print      Print each patch.
+    -v, --verbose    Be verbose.
     -h, --help       Display this message.
 "
     exit
@@ -48,6 +49,7 @@ cwd=
 applied=false
 print=false
 refresh=false
+verbose=false
 while [ $# -gt 0 ]
 do
     option="$1"
@@ -59,6 +61,7 @@ do
         -p | --print) print=true ;;
         -r | --refresh) refresh=true ;;
         -s | --sleep) [ $# -gt 0 ] || missing_arg "$option" ; sleep="$1" ; shift ;;
+        -v | --verbose) verbose=true ;;
         -h | --help) usage ;;
         --) break ;;
         -*) unknown_option "$option" ;;
@@ -87,7 +90,12 @@ qtop="$(hg qtop)" 2>/dev/null
 for patch ; do
     hg qgoto --quiet "$patch" || exit $?
 
-    ! $print || hg tip
+    if $print && $verbose ; then
+        hg tip --verbose
+    elif $print ; then
+        hg tip
+    fi
+
     ! $refresh || hg qrefresh
 
     [ -z "$sleep" ] || sleep $sleep
