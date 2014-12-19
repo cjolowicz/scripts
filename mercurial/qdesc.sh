@@ -19,9 +19,11 @@ options:
         --cwd DIR       Change working directory.
     -p, --prepend       Prepend text to the description.
     -A, --append        Append text to the description.
+    -s, --sed PROG  [+] Apply a sed(1) program to the description.
     -n, --dry-run       Print commands instead of executing them.
     -h, --help          Display this message.
-"
+
+[+] marked option can be specified multiple times"
     exit
 }
 
@@ -88,6 +90,8 @@ $(read_desc $name)"
 $(read_desc $name)
 
 $message"
+    elif [ ${#sed[@]} -gt 0 ] ; then
+        desc="$(read_desc $name | sed "${sed[@]}")"
     else
         desc="$message"
     fi
@@ -107,6 +111,7 @@ applied=false
 dry_run=false
 append=false
 prepend=false
+sed=()
 while [ $# -gt 0 ]
 do
     option="$1"
@@ -122,6 +127,12 @@ do
         --cwd)
             [ $# -gt 0 ] || missing_arg "$option"
             cwd="$1"
+            shift
+            ;;
+
+        -s | --sed)
+            [ $# -gt 0 ] || missing_arg "$option"
+            sed+=(-e "$1")
             shift
             ;;
 
@@ -147,12 +158,18 @@ else
     set -- $(hg qapplied)
 fi
 
-if $prepend && $append ; then
-    bad_usage "both \`--prepend' and \`--append' specified"
-fi
+if [ ${#sed[@]} -gt 0 ] ; then
+    if $prepend || $append ; then
+        bad_usage "\`--sed' cannot be specified with \`--prepend' or \`--append'"
+    fi
 
-if [ -z "$message" ] ; then
-    message="$(cat)"
+    [ -z "$message" ] || bad_usage "both \`--sed' and \`--message' specified"
+else
+    if $prepend && $append ; then
+        bad_usage "\`--prepend' cannot be specified with \`--append'"
+    fi
+
+    [ -n "$message" ] || message="$(cat)"
 fi
 
 ### main ###############################################################
