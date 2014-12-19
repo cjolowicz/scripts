@@ -14,15 +14,16 @@ usage: $prog [options] [patch]..
 Update the patch description.
 
 options:
-    -m, --message TEXT  Specify message instead of reading from stdin.
-    -a, --applied       Rewrite all applied patches.
-        --cwd DIR       Change working directory.
-    -p, --prepend       Prepend text to the description.
-    -A, --append        Append text to the description.
-    -s, --sed PROG  [+] Apply a sed(1) program to the description.
-    -N, --from-name     Determine the description from the patch name.
-    -n, --dry-run       Print commands instead of executing them.
-    -h, --help          Display this message.
+    -a, --applied          Rewrite all applied patches.
+    -m, --message TEXT     Replace description with the specified message.
+    -i, --from-stdin       Replace description with text read from standard input.
+    -p, --prepend TEXT [+] Prepend text to the description.
+    -A, --append TEXT  [+] Append text to the description.
+    -s, --sed PROG     [+] Apply a sed(1) program to the description.
+    -N, --from-name        Determine the description from the patch name.
+        --cwd DIR          Change working directory.
+    -n, --dry-run          Print commands instead of executing them.
+    -h, --help             Display this message.
 
 [+] marked option can be specified multiple times"
     exit
@@ -73,6 +74,17 @@ read_desc() {
     hg log --rev "\"$name\"" --template '{desc}'
 }
 
+write_desc() {
+    local name="$1"
+    local desc="$2"
+
+    if $dry_run ; then
+        $run hg qrefresh --message="\"$desc\""
+    else
+        $run hg qrefresh --message="$desc"
+    fi
+}
+
 from_name() {
     local name="$1"
     local desc=
@@ -87,11 +99,7 @@ from_name() {
 
     desc="$(sed 's,.,\U&,;s,$,.,;s,-, ,g' <<< "$name")"
 
-    if $dry_run ; then
-        $run hg qrefresh --message="\"$desc\""
-    else
-        $run hg qrefresh --message="$desc"
-    fi
+    write_desc "$name" "$desc"
 }
 
 rewrite() {
@@ -106,38 +114,39 @@ rewrite() {
         from_name "$name"
     fi
 
-    if $prepend ; then
-        desc="\
-$message
-
-$(read_desc $name)"
-    elif $append ; then
-        desc="\
-$(read_desc $name)
-
-$message"
-    elif [ ${#sed[@]} -gt 0 ] ; then
-        desc="$(read_desc $name | sed "${sed[@]}")"
-    else
-        desc="$message"
+    if [ -n "$replace" ] ; then
+        write_desc "$name" "$replace"
     fi
 
-    if $dry_run ; then
-        $run hg qrefresh --message="\"$desc\""
-    else
-        $run hg qrefresh --message="$desc"
+    if [ -n "$prepend" ] ; then
+        write_desc "$name" "\
+$prepend
+
+$(read_desc $name)"
+    fi
+
+    if [ -n "$append" ] ; then
+        write_desc "$name" "\
+$(read_desc $name)
+
+$append"
+    fi
+
+    if [ ${#sed[@]} -gt 0 ] ; then
+        write_desc "$name" "$(read_desc $name | sed "${sed[@]}")"
     fi
 }
 
 ### command line #######################################################
 
-message=
 cwd=
 applied=false
 dry_run=false
-append=false
-prepend=false
 from_name=false
+from_stdin=false
+replace=
+append=
+prepend=
 sed=()
 while [ $# -gt 0 ]
 do
@@ -147,7 +156,7 @@ do
     case $option in
         -m | --message)
             [ $# -gt 0 ] || missing_arg "$option"
-            message="$1"
+            replace="$1"
             shift
             ;;
 
@@ -163,8 +172,25 @@ do
             shift
             ;;
 
-        -p | --prepend) prepend=true ;;
-        -A | --append) append=true ;;
+        -p | --prepend)
+            [ $# -gt 0 ] || missing_arg "$option"
+
+            prepend="$1${prepend+
+
+}$prepend"
+            shift
+            ;;
+
+        -A | --append)
+            [ $# -gt 0 ] || missing_arg "$option"
+
+            append="$append${append+
+
+}$1"
+            shift
+            ;;
+
+        -i | --from-stdin) from_stdin=true ;;
         -a | --applied) applied=true ;;
         -N | --from-name) from_name=true ;;
         -n | --dry-run) dry_run=true ;;
@@ -186,20 +212,14 @@ else
     set -- $(hg qapplied)
 fi
 
-if [ ${#sed[@]} -gt 0 ] ; then
-    if $prepend || $append ; then
-        bad_usage "\`--sed' cannot be specified with \`--prepend' or \`--append'"
-    fi
+if $from_stdin ; then
+    [ -z "$replace" ] || bad_usage "both \`--from-stdin' and \`--message' specified"
 
-    [ -z "$message" ] || bad_usage "both \`--sed' and \`--message' specified"
-else
-    if $prepend && $append ; then
-        bad_usage "\`--prepend' cannot be specified with \`--append'"
-    fi
+    replace="$(cat)"
+fi
 
-    if ! $from_name ; then
-        [ -n "$message" ] || message="$(cat)"
-    fi
+if $from_name ; then
+    [ -z "$replace" ] || bad_usage "both \`--from-name' and \`--message' or \`--from-stdin' specified"
 fi
 
 ### main ###############################################################
