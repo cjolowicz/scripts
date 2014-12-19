@@ -20,6 +20,7 @@ options:
     -p, --prepend       Prepend text to the description.
     -A, --append        Append text to the description.
     -s, --sed PROG  [+] Apply a sed(1) program to the description.
+    -N, --from-name     Determine the description from the patch name.
     -n, --dry-run       Print commands instead of executing them.
     -h, --help          Display this message.
 
@@ -72,6 +73,27 @@ read_desc() {
     hg log --rev "\"$name\"" --template '{desc}'
 }
 
+from_name() {
+    local name="$1"
+    local desc=
+
+    qgoto "$name"
+
+    desc="$(hg log --rev "\"$name\"" --template '{desc}')"
+
+    if [ -n "$desc" ] && [ "$desc" != "imported patch $name" ] && ! $force ; then
+        error "description is already to set, use --force to override"
+    fi
+
+    desc="$(sed 's,.,\U&,;s,$,.,;s,-, ,g' <<< "$name")"
+
+    if $dry_run ; then
+        $run hg qrefresh --message="\"$desc\""
+    else
+        $run hg qrefresh --message="$desc"
+    fi
+}
+
 rewrite() {
     local name="$1"
     local desc=
@@ -79,6 +101,10 @@ rewrite() {
     $dry_run || echo "$name" >&2
 
     qgoto "$name"
+
+    if $from_name ; then
+        from_name "$name"
+    fi
 
     if $prepend ; then
         desc="\
@@ -111,6 +137,7 @@ applied=false
 dry_run=false
 append=false
 prepend=false
+from_name=false
 sed=()
 while [ $# -gt 0 ]
 do
@@ -139,6 +166,7 @@ do
         -p | --prepend) prepend=true ;;
         -A | --append) append=true ;;
         -a | --applied) applied=true ;;
+        -N | --from-name) from_name=true ;;
         -n | --dry-run) dry_run=true ;;
         -h | --help) usage ;;
         --) break ;;
@@ -152,7 +180,7 @@ if $dry_run ; then
 fi
 
 if ! $applied ; then
-    [ $# -gt 0 ] || bad_usage "missing argument"
+    [ $# -gt 0 ] || bad_usage "no patch specified"
 else
     [ $# -eq 0 ] || bad_usage "unexpected argument \`$1'"
     set -- $(hg qapplied)
@@ -169,7 +197,9 @@ else
         bad_usage "\`--prepend' cannot be specified with \`--append'"
     fi
 
-    [ -n "$message" ] || message="$(cat)"
+    if ! $from_name ; then
+        [ -n "$message" ] || message="$(cat)"
+    fi
 fi
 
 ### main ###############################################################
