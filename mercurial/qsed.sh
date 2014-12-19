@@ -10,7 +10,7 @@ prog=$(basename $0)
 usage() {
     echo "\
 usage: $prog [options] [patch]..
-       $prog [options] --applied
+       $prog [options] [--all | --applied | --unapplied]
 Update the patch name using sed(1).
 
 options:
@@ -130,6 +130,8 @@ elif $unapplied ; then
     [ $# -eq 0 ] || bad_usage "unexpected argument \`$1'"
 
     set -- $(hg qunapplied)
+else
+    [ $# -gt 0 ] || set -- $(hg qtop)
 fi
 
 [ $# -gt 0 ] || bad_usage "no patch specified"
