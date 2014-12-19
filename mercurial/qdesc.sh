@@ -23,6 +23,7 @@ options:
     -A, --append TEXT  [+] Append text to the description.
     -s, --sed PROG     [+] Apply a sed(1) program to the description.
     -N, --from-name        Determine the description from the patch name.
+    -#, --number           Append patch number to short descriptions.
         --cwd DIR          Change working directory.
     -n, --dry-run          Print commands instead of executing them.
     -h, --help             Display this message.
@@ -73,7 +74,7 @@ qgoto() {
 read_desc() {
     local name="$1"
 
-    hg log --rev "\"$name\"" --template '{desc}'
+    hg log --rev "\"$name\"" --template '{desc}' | grep -v $name
 }
 
 write_desc() {
@@ -87,56 +88,49 @@ write_desc() {
     fi
 }
 
-from_name() {
-    local name="$1"
-    local desc=
-
-    qgoto "$name"
-
-    desc="$(hg log --rev "\"$name\"" --template '{desc}')"
-
-    if [ -n "$desc" ] && [ "$desc" != "imported patch $name" ] && ! $force ; then
-        error "description is already to set, use --force to override"
-    fi
-
-    desc="$(sed 's,.,\U&,;s,$,.,;s,-, ,g' <<< "$name")"
-
-    write_desc "$name" "$desc"
-}
-
 rewrite() {
     local name="$1"
     local desc=
+    local item=
+    local suffix=
 
-    $dry_run || echo "$name" >&2
+    $dry_run || echo $name >&2
 
-    qgoto "$name"
-
-    if $from_name ; then
-        from_name "$name"
-    fi
+    qgoto $name
 
     if [ -n "$replace" ] ; then
-        write_desc "$name" "$replace"
+        desc="$replace"
+    elif $from_name ; then
+        desc="$(sed -e 's,.,\U&,' -e 's,$,.,' -e 's,-, ,g' <<< $name)"
+    else
+        desc="$(read_desc $name)"
     fi
 
-    if [ -n "$prepend" ] ; then
-        write_desc "$name" "\
-$prepend
+    for item in "${prepend[@]}" ; do
+        desc="\
+$item${desc:+
 
-$(read_desc $name)"
-    fi
+}$desc"
+    done
 
-    if [ -n "$append" ] ; then
-        write_desc "$name" "\
-$(read_desc $name)
+    for item in "${append[@]}" ; do
+        desc="\
+$desc${desc:+
 
-$append"
-    fi
+}$item"
+    done
 
     if [ ${#sed[@]} -gt 0 ] ; then
-        write_desc "$name" "$(read_desc $name | sed "${sed[@]}")"
+        desc="$(sed "${sed[@]}" <<< "$desc")"
     fi
+
+    if $number ; then
+        suffix=" (%0${#total_patches}d/%d)"
+        suffix="$(printf "$suffix" "$patch_number" "$total_patches")"
+        desc="$(sed -e "1s,\$,$suffix," <<< "$desc")"
+    fi
+
+    write_desc $name "$desc"
 }
 
 ### command line #######################################################
@@ -148,9 +142,10 @@ unapplied=false
 dry_run=false
 from_name=false
 from_stdin=false
+number=false
 replace=
-append=
-prepend=
+append=()
+prepend=()
 sed=()
 while [ $# -gt 0 ]
 do
@@ -178,23 +173,18 @@ do
 
         -p | --prepend)
             [ $# -gt 0 ] || missing_arg "$option"
-
-            prepend="$1${prepend+
-
-}$prepend"
+            prepend+=("$1")
             shift
             ;;
 
         -A | --append)
             [ $# -gt 0 ] || missing_arg "$option"
-
-            append="$append${append+
-
-}$1"
+            append+=("$1")
             shift
             ;;
 
         -i | --from-stdin) from_stdin=true ;;
+        -# | --number) number=true ;;
         -a | --all) all=true ;;
         --applied) applied=true ;;
         --unapplied) unapplied=true ;;
@@ -254,7 +244,12 @@ hg root --mq >/dev/null || error "no patch repository"
 
 oldtop="$(hg qtop)" 2>/dev/null
 
+total_patches=$#
+patch_number=0
+
 for patch ; do
+    ((++patch_number))
+
     rewrite "$patch"
 done
 
