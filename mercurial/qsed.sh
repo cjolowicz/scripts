@@ -41,30 +41,6 @@ missing_arg() {
     bad_usage "option \`$1' requires an argument"
 }
 
-for alias in qpop qgoto ; do
-    unalias $alias 2>/dev/null || true
-done
-
-qpop() {
-    if $dry_run ; then
-        $run hg qpop --quiet "$@"
-    else
-        $run hg qpop --quiet "$@" | (
-            grep -v '^now at:' || true
-        )
-    fi
-}
-
-qgoto() {
-    if $dry_run ; then
-        $run hg qgoto --quiet "$@"
-    else
-        $run hg qgoto --quiet "$@" 2>&1 | (
-            grep -Ev '^(now at:|patch .* is empty|.* is already at the top)' || true
-        ) >&2
-    fi
-}
-
 rewrite() {
     local old="$1"
     local new="$(sed "${sed[@]}" <<< "$old")"
@@ -149,16 +125,6 @@ fi
 hg root >/dev/null || error "no repository"
 hg root --mq >/dev/null || error "no patch repository"
 
-oldtop="$(hg qtop)" 2>/dev/null
-
 for patch ; do
     rewrite "$patch"
 done
-
-if ! $dry_run ; then
-    if [ -n "$oldtop" ] ; then
-	qgoto "$oldtop"
-    else
-	qpop --all
-    fi
-fi
