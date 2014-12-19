@@ -10,11 +10,13 @@ prog=$(basename $0)
 usage() {
     echo "\
 usage: $prog [options] [patch]..
-       $prog [options] --applied
+       $prog [options] [--all | --applied | --unapplied]
 Update the patch description.
 
 options:
-    -a, --applied          Rewrite all applied patches.
+    -a, --all              Rewrite all patches.
+        --applied          Rewrite all applied patches.
+        --unapplied        Rewrite all unapplied patches.
     -m, --message TEXT     Replace description with the specified message.
     -i, --from-stdin       Replace description with text read from standard input.
     -p, --prepend TEXT [+] Prepend text to the description.
@@ -140,7 +142,9 @@ $append"
 ### command line #######################################################
 
 cwd=
+all=false
 applied=false
+unapplied=false
 dry_run=false
 from_name=false
 from_stdin=false
@@ -191,7 +195,9 @@ do
             ;;
 
         -i | --from-stdin) from_stdin=true ;;
-        -a | --applied) applied=true ;;
+        -a | --all) all=true ;;
+        --applied) applied=true ;;
+        --unapplied) unapplied=true ;;
         -N | --from-name) from_name=true ;;
         -n | --dry-run) dry_run=true ;;
         -h | --help) usage ;;
@@ -205,12 +211,23 @@ if $dry_run ; then
     run=echo
 fi
 
-if ! $applied ; then
-    [ $# -gt 0 ] || bad_usage "no patch specified"
-else
+if $all ; then
     [ $# -eq 0 ] || bad_usage "unexpected argument \`$1'"
+
+    set -- $(hg qseries)
+elif $applied ; then
+    [ $# -eq 0 ] || bad_usage "unexpected argument \`$1'"
+
     set -- $(hg qapplied)
+elif $unapplied ; then
+    [ $# -eq 0 ] || bad_usage "unexpected argument \`$1'"
+
+    set -- $(hg qunapplied)
+else
+    [ $# -gt 0 ] || set -- $(hg qtop)
 fi
+
+[ $# -gt 0 ] || bad_usage "no patch specified"
 
 if $from_stdin ; then
     [ -z "$replace" ] || bad_usage "both \`--from-stdin' and \`--message' specified"
