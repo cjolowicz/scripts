@@ -191,6 +191,12 @@ esac
 
 ### main ###############################################################
 
+if [ -z "$cwd" ] ; then
+    if cwd="$(hg root 2>/dev/null)" ; then
+        cwd="$(realpath "$cwd"/..)"
+    fi
+fi
+
 if [ -n "$cwd" ] ; then
     if $dry_run ; then
         echo "cd $cwd"
@@ -211,6 +217,17 @@ if [ -z "$hg_command" ] && ! $list ; then
 fi
 
 error=0
+
+if [ ${#repositories[@]} -eq 0 ] ; then
+    repositories=($(
+        find . -mindepth 2 -maxdepth 2 -type d -name '.hg' |
+        while read dir ; do
+            if [ -f "$dir/hgrc" ] ; then
+                basename "$(realpath "$dir/..")"
+            fi
+        done
+    ))
+fi
 
 for repository in "${repositories[@]}"
 do
