@@ -2,6 +2,8 @@
 
 bindir=$HOME/bin
 
+mkdir -p $bindir
+
 for file ; do
     file="$(realpath "$file")"
     name="$(basename "$file")"
