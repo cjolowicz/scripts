@@ -14,6 +14,7 @@ Fold the two top-most patches { A B } into A.
 options:
     -n, --dry-run   Print commands instead of executing them.
     -v, --verbose   Be verbose.
+    -q, --quiet     Be quiet.
     -h, --help      Display this message.
 
 This program performs a fold of two patches { A B } using the
@@ -92,6 +93,7 @@ do
     case $option in
         -n | --dry-run) dry_run=true ;;
         -v | --verbose) ((++verbose)) ;;
+        -q | --quiet) ((--verbose)) ;;
         -h | --help) usage ; exit ;;
         --) break ;;
         -*) bad_option $option ;;
