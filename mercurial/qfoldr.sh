@@ -49,7 +49,11 @@ verbose() {
     local level=$1
     shift
 
-    [ $verbose -lt $level ] || echo "$prog: $*" >&2
+    if [ $verbose -gt $level ] ; then
+        echo "$prog: *** $*" >&2
+    elif [ $verbose -eq $level ] ; then
+        echo "$prog: $*" >&2
+    fi
 }
 
 for alias in qpush qpop qgoto qrefresh qfold qnew ; do
