@@ -93,7 +93,7 @@ qpush() {
     if $dry_run ; then
         $run hg qpush --quiet "$@"
     else
-        verbose 2 hg qpush --quiet "$@"
+        verbose 1 hg qpush --quiet "$@"
         $run hg qpush --quiet "$@" 2>&1 | (
             grep -Ev '^(now at:|patch .* is empty)' || true
         ) >&2
@@ -104,7 +104,7 @@ qpop() {
     if $dry_run ; then
         $run hg qpop --quiet "$@"
     else
-        verbose 2 hg qpop --quiet "$@"
+        verbose 1 hg qpop --quiet "$@"
         $run hg qpop --quiet "$@" | (
             grep -Ev '^(now at:|patch queue now empty)' || true
         )
@@ -115,7 +115,7 @@ qrefresh() {
     if $dry_run ; then
         $run hg qrefresh "$@"
     else
-        verbose 2 hg qrefresh "$@"
+        verbose 1 hg qrefresh "$@"
         $run hg qrefresh "$@"
     fi
 }
@@ -124,7 +124,7 @@ qnew() {
     if $dry_run ; then
         $run hg qnew "$@"
     else
-        verbose 2 hg qnew "$@"
+        verbose 1 hg qnew "$@"
         $run hg qnew "$@"
     fi
 }
@@ -133,7 +133,7 @@ qdelete() {
     if $dry_run ; then
         $run hg qdelete "$@"
     else
-        verbose 2 hg qdelete "$@"
+        verbose 1 hg qdelete "$@"
         $run hg qdelete "$@"
     fi
 }
@@ -142,7 +142,7 @@ qimport() {
     if $dry_run ; then
         $run hg qimport --quiet "$@"
     else
-        verbose 2 hg qimport --quiet "$@"
+        verbose 1 hg qimport --quiet "$@"
         $run hg qimport --quiet "$@" 2>&1 | (
             grep -Ev '^(adding .* to series file)' || true
         ) >&2
@@ -162,7 +162,7 @@ reverse() {
         $run hg diff --git --reverse --change $1 \|
         qimport --quiet --git --name REVERSE-$1 -
     else
-        verbose 2 hg diff --git --reverse --change $1 \|
+        verbose 1 hg diff --git --reverse --change $1 \|
         hg diff --git --reverse --change $1 |
         qimport --quiet --git --name REVERSE-$1 -
     fi
@@ -174,7 +174,7 @@ duplicate() {
         $run hg diff --git --change $1 \|
         qimport --quiet --git --name COPY-$1 -
     else
-        verbose 2 hg diff --git --change $1 \|
+        verbose 1 hg diff --git --change $1 \|
         hg diff --git --change $1 |
         qimport --quiet --git --name COPY-$1 -
     fi
@@ -186,7 +186,7 @@ start_right() {
     acopy=COPY-$a
     arev=REVERSE-$acopy
 
-    verbose 1 "Preparing..."
+    verbose 0 "Preparing..."
 
     qpop                         # { A       | B }
     qrefresh --exclude "$hgroot" # { 0       | B } -- "0" is a zero patch with A's metainfo
@@ -196,7 +196,7 @@ start_right() {
     qpush --move $acopy          # { A'      | 0 B }
     qpush --move $b              # { A' B    | 0 }
 
-    verbose 1 "Reverse \`$a'"
+    verbose 0 "Reverse \`$a'"
 
     reverse $acopy ||            # { A' B -A | 0 }
         error "resolve conflicts and qrefresh, \`$prog --continue' to resume."
@@ -213,7 +213,7 @@ resume_right() {
 }
 
 abort_right() {
-    verbose 1 "Cleaning up..."
+    verbose 0 "Cleaning up..."
 
     qpop            # { A' B | -A 0 }
     qpop            # { A'   | B -A 0 }
@@ -224,11 +224,11 @@ abort_right() {
     qpush           # { A B  | -A }
     qdelete $arev   # { A B }
 
-    verbose 1 "Done."
+    verbose 0 "Done."
 }
 
 finish_right() {
-    verbose 1 "Reverse-reverse \`$a'"
+    verbose 0 "Reverse-reverse \`$a'"
 
     qpush            # { A' B -A 0 }
     reverse $arev || # { A' B -A 0 --A }
@@ -237,13 +237,13 @@ finish_right() {
     qfoldl # { A' B -A A" }
     qpop   # { A' B -A | A" }
 
-    verbose 1 "Fold into \`$b'"
+    verbose 0 "Fold into \`$b'"
 
     qfoldl # { A' B'   | A" }
     qfoldr # { B"      | A" }
     qpush  # { B" A" }
 
-    verbose 1 "Done."
+    verbose 0 "Done."
 }
 
 start_left() {
@@ -251,13 +251,13 @@ start_left() {
     b=$(hg qtop)
     bcopy=COPY-$b
 
-    verbose 1 "Preparing..."
+    verbose 0 "Preparing..."
 
     duplicate $b                 # { A B         | B' }
     qpop                         # { A           | B B' }
     qpop                         # {             | A B B' }
 
-    verbose 1 "Apply \`$b'"
+    verbose 0 "Apply \`$b'"
 
     qpush --move $b ||           # { B"          | A B' }
         error "resolve conflicts and qrefresh, \`$prog --left --continue' to resume."
@@ -272,7 +272,7 @@ resume_left() {
 }
 
 abort_left() {
-    verbose 1 "Cleaning up..."
+    verbose 0 "Cleaning up..."
 
     qrefresh --exclude "$hgroot"
     hg revert --all # { 0      | A B' }
@@ -282,25 +282,25 @@ abort_left() {
     qpush           # { A 0 B' }
     qfoldl          # { A B }
 
-    verbose 1 "Done."
+    verbose 0 "Done."
 }
 
 finish_left() {
-    verbose 1 "Reverse \`$b'"
+    verbose 0 "Reverse \`$b'"
 
     reverse $b # { B" -B"      | A B' }
 
-    verbose 1 "Apply original patches."
+    verbose 0 "Apply original patches."
 
     qpush      # { B" -B" A    | B' }
     qpush      # { B" -B" A B' }
 
-    verbose 1 "Fold into \`$a'"
+    verbose 0 "Fold into \`$a'"
 
     qfoldl     # { B" -B" A' }
     qfoldr     # { B" A" }
 
-    verbose 1 "Done."
+    verbose 0 "Done."
 }
 
 start() {
