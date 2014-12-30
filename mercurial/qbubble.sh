@@ -356,8 +356,11 @@ fi
 
 ### main ###############################################################
 
-hgroot=$(hg root) ||
-    error "no repository"
+hgroot="$(hg root)" ||
+    error "not in a mercurial repository"
+
+[ $(hg status -q | wc -l) -eq 0 ] ||
+    error "working directory has uncommitted changes"
 
 which qfoldl >/dev/null 2>&1 ||
     error "qfoldl not found"
