@@ -44,9 +44,11 @@ verbose() {
     local level=$1
     shift
 
-    if [ $verbose -gt $level ] ; then
-        echo "$prog: *** $*" >&2
-    elif [ $verbose -eq $level ] ; then
+    if [ $verbose -lt $level ] ; then
+        :
+    elif [ $level -ge 1 ] ; then
+        echo "$*" >&2
+    else
         echo "$prog: $*" >&2
     fi
 }
