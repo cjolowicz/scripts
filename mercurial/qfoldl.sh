@@ -55,7 +55,7 @@ qpop() {
     if $dry_run ; then
         $run hg qpop --quiet "$@"
     else
-        verbose 2 hg qpop --quiet "$@"
+        verbose 1 hg qpop --quiet "$@"
         $run hg qpop --quiet "$@" | (
             grep -Ev '^(now at:|patch queue now empty)' || true
 	)
@@ -66,7 +66,7 @@ qrefresh() {
     if $dry_run ; then
         $run hg qrefresh "$@"
     else
-        verbose 2 hg qrefresh "$@"
+        verbose 1 hg qrefresh "$@"
         $run hg qrefresh "$@"
     fi
 }
@@ -75,7 +75,7 @@ qfold() {
     if $dry_run ; then
         $run hg qfold "$@"
     else
-        verbose 2 hg qfold "$@"
+        verbose 1 hg qfold "$@"
         $run hg qfold "$@"
     fi
 }
