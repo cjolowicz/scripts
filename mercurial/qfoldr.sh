@@ -60,7 +60,7 @@ qpush() {
     if $dry_run ; then
         $run hg qpush --quiet "$@"
     else
-        verbose 2 hg qpush --quiet "$@"
+        verbose 1 hg qpush --quiet "$@"
         $run hg qpush --quiet "$@" 2>&1 | (
             grep -Ev '^(now at:|patch .* is empty)' || true
 	) >&2
@@ -71,7 +71,7 @@ qpop() {
     if $dry_run ; then
         $run hg qpop --quiet "$@"
     else
-        verbose 2 hg qpop --quiet "$@"
+        verbose 1 hg qpop --quiet "$@"
         $run hg qpop --quiet "$@" | (
             grep -Ev '^(now at:|patch queue now empty)' || true
 	)
@@ -82,7 +82,7 @@ qgoto() {
     if $dry_run ; then
         $run hg qgoto --quiet "$@"
     else
-        verbose 2 hg qgoto --quiet "$@"
+        verbose 1 hg qgoto --quiet "$@"
         $run hg qgoto --quiet "$@" 2>&1 | (
             grep -Ev '^(now at:|patch .* is empty)' || true
 	) >&2
@@ -93,7 +93,7 @@ qrefresh() {
     if $dry_run ; then
         $run hg qrefresh "$@"
     else
-        verbose 2 hg qrefresh "$@"
+        verbose 1 hg qrefresh "$@"
         $run hg qrefresh "$@"
     fi
 }
@@ -102,7 +102,7 @@ qfold() {
     if $dry_run ; then
         $run hg qfold "$@"
     else
-        verbose 2 hg qfold "$@"
+        verbose 1 hg qfold "$@"
         $run hg qfold "$@"
     fi
 }
@@ -111,7 +111,7 @@ qnew() {
     if $dry_run ; then
         $run hg qnew "$@"
     else
-        verbose 2 hg qnew "$@"
+        verbose 1 hg qnew "$@"
         $run hg qnew "$@"
     fi
 }
