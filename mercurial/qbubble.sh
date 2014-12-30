@@ -17,6 +17,7 @@ options:
         --left      Inverse procedure (see below).
     -n, --dry-run   Print commands instead of executing them.
     -v, --verbose   Be verbose.
+    -q, --quiet     Be quiet.
     -h, --help      Display this message.
 
 This program reverses the order of two patches { A B } using the
@@ -338,6 +339,7 @@ do
         -n | --dry-run) dry_run=true ; options+=(--dry-run) ;;
         --left) left=true ;;
         -v | --verbose) ((++verbose)) ; options+=(--verbose) ;;
+        -q | --quiet) ((--verbose)) ; options+=(--quiet) ;;
         -h | --help) usage ; exit ;;
         --) break ;;
         -*) bad_option $option ;;
