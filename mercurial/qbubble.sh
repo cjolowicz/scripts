@@ -10,10 +10,8 @@ prog=$(basename $0)
 usage() {
     echo "usage: $prog [options]
 
-Reverse the order of the two top-most patches. With \`--dest', reorder
-the top-most patch until the specified patch precedes it, pushing or
-popping patches as needed. Use \`--dest qparent' to move a patch to
-the front.
+Move the top-most patch to the front. With \`--dest', reorder the
+top-most patch until the specified patch precedes it.
 
 When moving a patch towards the front, manual intervention may be
 required to apply the patch. When moving a patch towards the back,
@@ -414,9 +412,9 @@ qtop=$(hg qtop) 2>/dev/null ||
     error "no patches applied"
 
 [ "$dest" != "$qtop" ] ||
-    error "a patch be its own predecessor"
+    error "a patch cannot be its own predecessor"
 
-[ -n "$dest" ] || dest=$(previous $(previous))
+[ -n "$dest" ] || dest=qparent
 
 is_patch_in qseries "$dest" ||
     error "patch \`$dest' is not in series file"
