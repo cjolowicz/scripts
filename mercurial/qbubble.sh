@@ -11,7 +11,7 @@ usage() {
     echo "usage: $prog [options]
 
 Reverse the order of the two top-most patches. With \`--dest', reorder
-the top-most patch until it follows the specified patch, pushing or
+the top-most patch until the specified patch precedes it, pushing or
 popping patches as needed. Use \`--dest qparent' to move a patch to
 the front.
 
@@ -22,7 +22,7 @@ cases, operation may be resumed by re-invoking the program with the
 same options and \`--continue'.
 
 options:
-    -d, --dest PATCH  Reorder until the patch follows this one.
+    -d, --dest PATCH  Reorder patch until this patch precedes it.
     -c, --continue    Resume after conflict resolution.
     -A, --abort       Abort the operation.
     -C, --command CMD Use command to check patch state.
@@ -36,12 +36,6 @@ options:
 ##
 #  This program reverses the order of two patches { A B } as follows:
 #
-#  Moving A towards the back:
-#
-#      [1] { A B } => { A B -A } by reverse application of A (*)
-#      [2] { A B -A } => { A B -A --A } by reverse application of -A
-#      [3] { A B -A --A } => { B --A } by fold
-#
 #  Moving B towards the front:
 #
 #      [1] { A B } => { } by removal of A and B
@@ -49,6 +43,12 @@ options:
 #      [3] { B } => { B -B } by reverse application of B
 #      [4] { B -B } => { B -B A B } by application of A and B
 #      [5] { B -B A B } => { B A } by fold
+#
+#  Moving A towards the back:
+#
+#      [1] { A B } => { A B -A } by reverse application of A (*)
+#      [2] { A B -A } => { A B -A --A } by reverse application of -A
+#      [3] { A B -A --A } => { B --A } by fold
 #
 #  Steps marked with (*) may require manual intervention.
 ##
@@ -414,7 +414,7 @@ qtop=$(hg qtop) 2>/dev/null ||
     error "no patches applied"
 
 [ "$dest" != "$qtop" ] ||
-    error "a patch cannot follow itself"
+    error "a patch be its own predecessor"
 
 [ -n "$dest" ] || dest=$(previous $(previous))
 
