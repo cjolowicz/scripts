@@ -37,17 +37,17 @@ options:
 #
 #  Moving B towards the front:
 #
-#      [1] { A B } => { } by removal of A and B
-#      [2] { } => { B } by application of B (*)
-#      [3] { B } => { B -B } by reverse application of B
-#      [4] { B -B } => { B -B A B } by application of A and B
-#      [5] { B -B A B } => { B A } by fold
+#      [1] { } by removal of A and B
+#      [2] { B } by application of B (*)
+#      [3] { B -B } by reverse application of B
+#      [4] { B -B A B } by application of A and B
+#      [5] { B A } by fold
 #
 #  Moving A towards the back:
 #
-#      [1] { A B } => { A B -A } by reverse application of A (*)
-#      [2] { A B -A } => { A B -A --A } by reverse application of -A
-#      [3] { A B -A --A } => { B --A } by fold
+#      [1] { A B -A } by reverse application of A (*)
+#      [2] { A B -A --A } by reverse application of -A
+#      [3] { B --A } by fold
 #
 #  Steps marked with (*) may require manual intervention.
 ##
