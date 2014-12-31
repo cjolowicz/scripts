@@ -9,59 +9,48 @@ prog=$(basename $0)
 
 usage() {
     echo "usage: $prog [options]
-Reverse the order of the two top-most patches.
+
+Reverse the order of the two top-most patches. With \`--dest', reorder
+the top-most patch until it follows the specified patch, pushing or
+popping patches as needed. Use \`--dest qparent' to move a patch to
+the front.
+
+When moving a patch towards the front, manual intervention may be
+required to apply the patch. When moving a patch towards the back,
+manual intervention may be required to reverse the patch. In both
+cases, operation may be resumed by re-invoking the program with the
+same options and \`--continue'.
 
 options:
-    -c, --continue  Resume after conflict resolution.
-    -A, --abort     Abort the operation.
-        --left      Inverse procedure (see below).
-    -n, --dry-run   Print commands instead of executing them.
-    -v, --verbose   Be verbose.
-    -q, --quiet     Be quiet.
-    -h, --help      Display this message.
-
-This program reverses the order of two patches { A B } using the
-following procedure (simplified):
-
-    [1] reverse application of A
-
-        { A B } => { A B -A }
-
-    [2] reverse application of -A
-
-        { A B -A } => { A B -A A' }
-
-    [3] fold
-
-        { A B -A A' } => { B' A' }
-
-Step [1] may require manual intervention.
-
-When --left is specified, the following procedure is used instead:
-
-    [1] de-application of A and B
-
-        { A B } => { }
-
-    [2] application of B
-
-        { } => { B' }
-
-    [3] reverse application of B
-
-        { B' } => { B' -B' }
-
-    [4] application of A and B
-
-        { B' -B' } => { B' -B' A B }
-
-    [5] fold
-
-        { B' -B' A B } => { B' A' }
-
-Step [2] may require manual intervention.
+    -d, --dest PATCH  Reorder until the patch follows this one.
+    -c, --continue    Resume after conflict resolution.
+    -A, --abort       Abort the operation.
+    -v, --verbose     Be verbose.
+    -q, --quiet       Be quiet.
+    -n, --dry-run     Print commands instead of executing them.
+    -h, --help        Display this message.
 "
 }
+
+##
+#  This program reverses the order of two patches { A B } as follows:
+#
+#  Moving A towards the back:
+#
+#      [1] { A B } => { A B -A } by reverse application of A (*)
+#      [2] { A B -A } => { A B -A --A } by reverse application of -A
+#      [3] { A B -A --A } => { B --A } by fold
+#
+#  Moving B towards the front:
+#
+#      [1] { A B } => { } by removal of A and B
+#      [2] { } => { B } by application of B (*)
+#      [3] { B } => { B -B } by reverse application of B
+#      [4] { B -B } => { B -B A B } by application of A and B
+#      [5] { B -B A B } => { B A } by fold
+#
+#  Steps marked with (*) may require manual intervention.
+##
 
 error() {
     echo "$prog: $*" >&2
@@ -76,6 +65,10 @@ bad_usage() {
 
 bad_option() {
     bad_usage "unrecognized option \`$1'"
+}
+
+missing_arg () {
+    bad_usage "option \`$1' requires an argument"
 }
 
 verbose() {
@@ -190,41 +183,80 @@ duplicate() {
     fi
 }
 
-start_right() {
+start_front() {
     a=$(hg qprev)
     b=$(hg qtop)
+    bcopy=COPY-$b
+
+    verbose 0 "$a"
+
+    duplicate $b       # { A B | B' }
+    qpop               # { A   | B B' }
+    qpop               # {     | A B B' }
+    qpush --move $b || # { B"  | A B' }
+        error "resolve conflicts and qrefresh, \`$prog --continue' to resume."
+}
+
+resume_front() {
+    a=$(hg qnext)
+    b=$(hg qtop)
+    bcopy=$(hg qunapplied | head -n2 | tail -n1)
+
+    [ "$bcopy" = COPY-$b ] ||
+        error "unexpected patch \"$bcopy\", expected COPY-$b"
+}
+
+abort_front() {
+    qrefresh --exclude "$hgroot"
+    hg revert --all # { 0      | A B' }
+    qpop            # {        | 0 A B' }
+    qpush --move $a # { A      | 0 B' }
+    qpush           # { A 0    | B' }
+    qpush           # { A 0 B' }
+    qfoldl          # { A B }
+}
+
+finish_front() {
+    reverse $b # { B" -B"      | A B' }
+    qpush      # { B" -B" A    | B' }
+    qpush      # { B" -B" A B' }
+    qfoldl     # { B" -B" A' }
+    qfoldr     # { B" A" }
+    qpop       # { B" | A" }
+}
+
+start_back() {
+    a=$(hg qtop)
+    b=$(hg qnext)
     acopy=COPY-$a
     arev=REVERSE-$acopy
 
-    verbose 0 "Preparing..."
-
-    qpop                         # { A       | B }
+    verbose 0 "$b"
+                                 # { A       | B }
     qrefresh --exclude "$hgroot" # { 0       | B } -- "0" is a zero patch with A's metainfo
     qnew $acopy                  # { 0 A'    | B }
     qpop                         # { 0       | A' B }
     qpop                         # {         | 0 A' B }
     qpush --move $acopy          # { A'      | 0 B }
     qpush --move $b              # { A' B    | 0 }
-
-    verbose 0 "Reverse \`$a'"
-
     reverse $acopy ||            # { A' B -A | 0 }
         error "resolve conflicts and qrefresh, \`$prog --continue' to resume."
 }
 
-resume_right() {
+resume_back() {
     a=$(hg qnext)
     b=$(hg qprev)
     acopy=$(hg qapplied | tail -n3 | head -n1)
     arev=$(hg qtop)
 
-    [ "$acopy" = COPY-$a        ] || error "unexpected patch \"$acopy\", expected COPY-$a"
-    [ "$arev"  = REVERSE-$acopy ] || error "unexpected patch \"$arev\", expected REVERSE-$acopy"
+    [ "$acopy" = COPY-$a        ] ||
+        error "unexpected patch \"$acopy\", expected COPY-$a"
+
+    [ "$arev"  = REVERSE-$acopy ] ||
+        error "unexpected patch \"$arev\", expected REVERSE-$acopy"
 }
 
-abort_right() {
-    verbose 0 "Cleaning up..."
-
+abort_back() {
     qpop            # { A' B | -A 0 }
     qpop            # { A'   | B -A 0 }
     qpop            # {      | A' B -A 0 }
@@ -233,100 +265,74 @@ abort_right() {
     qfoldl          # { A    | B -A }
     qpush           # { A B  | -A }
     qdelete $arev   # { A B }
-
-    verbose 0 "Done."
 }
 
-finish_right() {
-    verbose 0 "Reverse-reverse \`$a'"
-
+finish_back() {
     qpush            # { A' B -A 0 }
     reverse $arev || # { A' B -A 0 --A }
         error "cannot reverse $arev"
 
     qfoldl # { A' B -A A" }
     qpop   # { A' B -A | A" }
-
-    verbose 0 "Fold into \`$b'"
-
     qfoldl # { A' B'   | A" }
     qfoldr # { B"      | A" }
     qpush  # { B" A" }
-
-    verbose 0 "Done."
-}
-
-start_left() {
-    a=$(hg qprev)
-    b=$(hg qtop)
-    bcopy=COPY-$b
-
-    verbose 0 "Preparing..."
-
-    duplicate $b                 # { A B         | B' }
-    qpop                         # { A           | B B' }
-    qpop                         # {             | A B B' }
-
-    verbose 0 "Apply \`$b'"
-
-    qpush --move $b ||           # { B"          | A B' }
-        error "resolve conflicts and qrefresh, \`$prog --left --continue' to resume."
-}
-
-resume_left() {
-    a=$(hg qnext)
-    b=$(hg qtop)
-    bcopy=$(hg qunapplied | head -n2 | tail -n1)
-
-    [ "$bcopy" = COPY-$b ] || error "unexpected patch \"$bcopy\", expected COPY-$b"
-}
-
-abort_left() {
-    verbose 0 "Cleaning up..."
-
-    qrefresh --exclude "$hgroot"
-    hg revert --all # { 0      | A B' }
-    qpop            # {        | 0 A B' }
-    qpush --move $a # { A      | 0 B' }
-    qpush           # { A 0    | B' }
-    qpush           # { A 0 B' }
-    qfoldl          # { A B }
-
-    verbose 0 "Done."
-}
-
-finish_left() {
-    verbose 0 "Reverse \`$b'"
-
-    reverse $b # { B" -B"      | A B' }
-
-    verbose 0 "Apply original patches."
-
-    qpush      # { B" -B" A    | B' }
-    qpush      # { B" -B" A B' }
-
-    verbose 0 "Fold into \`$a'"
-
-    qfoldl     # { B" -B" A' }
-    qfoldr     # { B" A" }
-
-    verbose 0 "Done."
 }
 
 start() {
-    $left && start_left || start_right
+    $front && start_front || start_back
 }
 
 resume() {
-    $left && resume_left || resume_right
+    $front && resume_front || resume_back
 }
 
 abort() {
-    $left && abort_left || abort_right
+    $front && abort_front || abort_back
 }
 
 finish() {
-    $left && finish_left || finish_right
+    $front && finish_front || finish_back
+}
+
+do_swap() {
+    start
+    finish
+}
+
+do_continue() {
+    resume
+    finish
+}
+
+do_abort() {
+    resume
+    abort
+}
+
+is_patch_in() {
+    local command="$1"
+    local patch="$2"
+    local other=
+
+    [ "$patch" != qparent ] || return 0
+
+    for other in $(hg $command) ; do
+        [ "$patch" != $other ] || return 0
+    done
+
+    return 1
+}
+
+previous() {
+    local patch="$1"
+    local previous=qparent
+
+    if [ "$patch" != qparent ] ; then
+        previous=$(hg qapplied -1 $patch 2>/dev/null) || previous=qparent
+    fi
+
+    echo $previous
 }
 
 ### command line #######################################################
@@ -334,9 +340,9 @@ finish() {
 options=()
 continue=false
 abort=false
-left=false
 verbose=0
 dry_run=false
+dest=
 
 while [ $# -gt 0 ]
 do
@@ -344,10 +350,15 @@ do
     shift
 
     case $option in
+        -d | --dest)
+            [ $# -gt 0 ] || missing_arg $option
+            dest="$1"
+            shift
+            ;;
+
         -c | --continue) continue=true ;;
         -A | --abort) abort=true ;;
         -n | --dry-run) dry_run=true ; options+=(--dry-run) ;;
-        --left) left=true ;;
         -v | --verbose) ((++verbose)) ; options+=(--verbose) ;;
         -q | --quiet) ((--verbose)) ; options+=(--quiet) ;;
         -h | --help) usage ; exit ;;
@@ -360,7 +371,7 @@ done
 [ $# -eq 0 ] || bad_option "$1"
 
 ! $abort || ! $continue ||
-    bad_usage "specified both --abort and --continue"
+    bad_usage "specified both \`--abort' and \`--continue'"
 
 if $dry_run ; then
     run=echo
@@ -368,25 +379,40 @@ fi
 
 ### main ###############################################################
 
-hgroot="$(hg root)" ||
-    error "not in a mercurial repository"
-
-[ $(hg status -q | wc -l) -eq 0 ] ||
-    error "working directory has uncommitted changes"
-
 which qfoldl >/dev/null 2>&1 ||
     error "qfoldl not found"
 
 which qfoldr >/dev/null 2>&1 ||
     error "qfoldr not found"
 
+hgroot="$(hg root)" ||
+    error "not in a mercurial repository"
+
+[ $(hg status -q | wc -l) -eq 0 ] ||
+    error "working directory has uncommitted changes"
+
+qtop=$(hg qtop) 2>/dev/null ||
+    error "no patches applied"
+
+[ "$dest" != "$qtop" ] ||
+    error "a patch cannot follow itself"
+
+[ -n "$dest" ] || dest=$(previous $(previous))
+
+is_patch_in qseries "$dest" ||
+    error "patch \`$dest' is not in series file"
+
+is_patch_in qapplied "$dest" && front=true || front=false
+
 if $abort ; then
-    resume
-    abort
-elif $continue ; then
-    resume
-    finish
-else
-    start
-    finish
+    do_abort
+    exit
 fi
+
+if $continue ; then
+    do_continue
+fi
+
+while [ "$dest" != $(previous) ] ; do
+    do_swap
+done
