@@ -25,6 +25,7 @@ options:
     -d, --dest PATCH  Reorder until the patch follows this one.
     -c, --continue    Resume after conflict resolution.
     -A, --abort       Abort the operation.
+    -C, --command CMD Use command to check patch state.
     -v, --verbose     Be verbose.
     -q, --quiet       Be quiet.
     -n, --dry-run     Print commands instead of executing them.
@@ -310,6 +311,17 @@ do_abort() {
     abort
 }
 
+do_command() {
+    [ -n "$command" ] || return 0
+
+    if $dry_run ; then
+        $run eval "\"$command\""
+    else
+        $run eval "$command" ||
+            error "command failed"
+    fi
+}
+
 is_patch_in() {
     local command="$1"
     local patch="$2"
@@ -340,6 +352,7 @@ previous() {
 options=()
 continue=false
 abort=false
+command=
 verbose=0
 dry_run=false
 dest=
@@ -353,6 +366,12 @@ do
         -d | --dest)
             [ $# -gt 0 ] || missing_arg $option
             dest="$1"
+            shift
+            ;;
+
+        -C | --command)
+            [ $# -gt 0 ] || missing_arg $option
+            command="$1"
             shift
             ;;
 
@@ -411,8 +430,10 @@ fi
 
 if $continue ; then
     do_continue
+    do_command
 fi
 
 while [ "$dest" != $(previous) ] ; do
     do_swap
+    do_command
 done
