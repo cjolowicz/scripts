@@ -47,7 +47,7 @@ rewrite() {
 
     if [ "$old" != "$new" ] ; then
         $dry_run || echo "\`$old' -> \`$new'" >&2
-        $run hg qrename "$old" "$new"
+        $run hg qrename -- "$old" "$new"
     else
         $dry_run || echo "\`$old' unchanged." >&2
     fi
