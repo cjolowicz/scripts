@@ -21,6 +21,7 @@ same options and \`--continue'.
 
 options:
     -d, --dest PATCH  Reorder patch until this patch precedes it.
+    -r, --reverse     Move the top-most patch to the back.
     -c, --continue    Resume after conflict resolution.
     -A, --abort       Abort the operation.
     -C, --command CMD Use command to check patch state.
@@ -354,6 +355,7 @@ command=
 verbose=0
 dry_run=false
 dest=
+reverse=false
 
 while [ $# -gt 0 ]
 do
@@ -373,6 +375,7 @@ do
             shift
             ;;
 
+        -r | --reverse) reverse=true ;;
         -c | --continue) continue=true ;;
         -A | --abort) abort=true ;;
         -n | --dry-run) dry_run=true ; options+=(--dry-run) ;;
@@ -389,6 +392,9 @@ done
 
 ! $abort || ! $continue ||
     bad_usage "specified both \`--abort' and \`--continue'"
+
+! $reverse || [ -z "$dest" ] ||
+    bad_usage "specified both \`--dest' and \`--reverse'"
 
 if $dry_run ; then
     run=echo
@@ -411,8 +417,14 @@ hgroot="$(hg root)" ||
 qtop=$(hg qtop) 2>/dev/null ||
     error "no patches applied"
 
-[ "$dest" != "$qtop" ] ||
-    error "a patch cannot be its own predecessor"
+if $reverse ; then
+    dest=$(hg qseries | tail -n1)
+
+    [ "$dest" != "$qtop" ] || exit 0
+else
+    [ "$dest" != "$qtop" ] ||
+        error "a patch cannot be its own predecessor"
+fi
 
 [ -n "$dest" ] || dest=qparent
 
