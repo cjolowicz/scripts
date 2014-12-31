@@ -41,13 +41,13 @@ options:
 #      [2] { B } by application of B (*)
 #      [3] { B -B } by reverse application of B
 #      [4] { B -B A B } by application of A and B
-#      [5] { B A } by fold
+#      [5] { B A } by fold of { -B A B }
 #
 #  Moving A towards the back:
 #
 #      [1] { A B -A } by reverse application of A (*)
 #      [2] { A B -A --A } by reverse application of -A
-#      [3] { B --A } by fold
+#      [3] { B --A } by fold of { A B -A }
 #
 #  Steps marked with (*) may require manual intervention.
 ##
