@@ -17,6 +17,7 @@ where T1 is the result of applying P to the parent and T2 is the
 result of applying Q to T1.
 
 options:
+    -n, --dry-run     Print commands instead of executing them.
     -h, --help        Display this message.
 "
 }
@@ -47,12 +48,15 @@ bad_option() {
 
 ### command line #######################################################
 
+dry_run=false
+
 while [ $# -gt 0 ]
 do
     option="$1"
     shift
 
     case $option in
+        -n | --dry-run) dry_run=true ; options+=(--dry-run) ;;
         -h | --help) usage ; exit ;;
         --) break ;;
         -*) bad_option $option ;;
@@ -61,6 +65,10 @@ do
 done
 
 [ $# -eq 0 ] || bad_option "$1"
+
+if $dry_run ; then
+    run=echo
+fi
 
 ### main ###############################################################
 
@@ -80,13 +88,23 @@ file="$mqroot/$patch"
 
 # Reset the changeset description.
 desc="$(hg tip --template '{desc}')"
-hg qrefresh --message=
+$run hg qrefresh --message=
 
 # Fold ( P ; Q ) into ( P + Q ).
-hg qpop
-hg qfold --keep "$patch"
+$run hg qpop
+$run hg qfold --keep "$patch"
 
 # Reverse ( Q ) to ( -Q ).
-patch --directory="$hgroot" --strip=1 --reverse < "$file"
-rm "$file"
-hg qnew --message="$desc" "$patch"
+if $dry_run ; then
+    $run patch --directory="$hgroot" --strip=1 --reverse '<' "$file"
+else
+    $run patch --directory="$hgroot" --strip=1 --reverse < "$file"
+fi
+
+$run rm "$file"
+
+if $dry_run ; then
+    $run hg qnew --message="\"$desc\"" "$patch"
+else
+    $run hg qnew --message="$desc" "$patch"
+fi
