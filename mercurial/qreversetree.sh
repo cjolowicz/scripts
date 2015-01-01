@@ -64,9 +64,20 @@ verbose() {
     fi
 }
 
-for alias in qpop qrefresh qfold qnew ; do
+for alias in qpush qpop qrefresh qnew qfold qimport ; do
     unalias $alias 2>/dev/null || true
 done
+
+qpush() {
+    if $dry_run ; then
+        $run hg qpush --quiet "$@"
+    else
+        verbose 1 hg qpush --quiet "$@"
+        $run hg qpush --quiet "$@" 2>&1 | (
+            grep -Ev '^(now at:|patch .* is empty)' || true
+        ) >&2
+    fi
+}
 
 qpop() {
     if $dry_run ; then
@@ -88,6 +99,17 @@ qrefresh() {
     fi
 }
 
+qimport() {
+    if $dry_run ; then
+        $run hg qimport --quiet "$@"
+    else
+        verbose 1 hg qimport --quiet "$@"
+        $run hg qimport --quiet "$@" 2>&1 | (
+            grep -Ev '^(adding .* to series file)' || true
+        ) >&2
+    fi
+}
+
 qnew() {
     if $dry_run ; then
         $run hg qnew "$@"
@@ -106,8 +128,20 @@ qfold() {
     fi
 }
 
+reverse() {
+    if $dry_run ; then
+        $run hg diff --git --reverse --change $1 \|
+        qimport --quiet --git --name REVERSE-$1 -
+    else
+        verbose 1 hg diff --git --reverse --change $1 \|
+        hg diff --git --reverse --change $1 |
+        qimport --quiet --git --name REVERSE-$1 -
+    fi
+}
+
 ### command line #######################################################
 
+options=()
 dry_run=false
 verbose=0
 
@@ -146,29 +180,11 @@ patch="$(hg qtop)" ||
 [ $(hg status -q | wc -l) -eq 0 ] ||
     error "working directory has uncommitted changes"
 
-file="$mqroot/$patch"
-
-# Reset the changeset description.
-desc="$(hg tip --template '{desc}')"
-qrefresh --message=
-
-# Fold ( P ; Q ) into ( P + Q ).
-qpop
-qfold --keep "$patch"
-
-# Reverse ( Q ) to ( -Q ).
-if $dry_run ; then
-    $run patch --directory="$hgroot" --strip=1 --reverse '<' "$file"
-else
-    verbose 1 patch --directory="$hgroot" --strip=1 --reverse '<' "$file"
-    $run patch --directory="$hgroot" --strip=1 --reverse < "$file"
-fi
-
-$run rm "$file"
-
-if $dry_run ; then
-    $run hg qnew --message="\"$desc\"" "$patch"
-else
-    verbose 1 hg qnew --message="\"$desc\"" "$patch"
-    $run hg qnew --message="$desc" "$patch"
-fi
+reverse "$patch"       # { A B | -B }
+qrefresh -X "$hgroot"  # { A 0 | -B }
+qnew COPY-"$patch"     # { A 0 B' | -B }
+qpop                   # { A 0 | B' -B }
+qpop                   # { A | 0 B' -B }
+qfold COPY-"$patch"    # { AB | 0 -B }
+qpush                  # { AB 0 | -B }
+qfold REVERSE-"$patch" # { AB -B }
