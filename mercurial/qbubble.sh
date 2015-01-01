@@ -77,7 +77,7 @@ verbose() {
 
     if [ $verbose -lt $level ] ; then
         :
-    elif [ $level -ge 1 ] ; then
+    elif [ $level -gt 0 ] ; then
         echo "$*" >&2
     elif [ $verbose -gt 0 ] ; then
         echo
