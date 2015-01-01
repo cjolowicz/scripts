@@ -17,6 +17,7 @@ where T1 is the result of applying P to the parent and T2 is the
 result of applying Q to T1.
 
 options:
+    -v, --verbose     Be verbose.
     -n, --dry-run     Print commands instead of executing them.
     -h, --help        Display this message.
 "
@@ -46,9 +47,69 @@ bad_option() {
     bad_usage "unrecognized option \`$1'"
 }
 
+verbose() {
+    local level=$1
+    shift
+
+    if [ $verbose -lt $level ] ; then
+        :
+    elif [ $level -gt 0 ] ; then
+        echo "$*" >&2
+    elif [ $verbose -gt 0 ] ; then
+        echo
+        echo "$prog: $*" >&2
+        echo
+    else
+        echo "$prog: $*" >&2
+    fi
+}
+
+for alias in qpop qrefresh qfold qnew ; do
+    unalias $alias 2>/dev/null || true
+done
+
+qpop() {
+    if $dry_run ; then
+        $run hg qpop --quiet "$@"
+    else
+        verbose 1 hg qpop --quiet "$@"
+        $run hg qpop --quiet "$@" | (
+            grep -Ev '^(now at:|patch queue now empty)' || true
+        )
+    fi
+}
+
+qrefresh() {
+    if $dry_run ; then
+        $run hg qrefresh "$@"
+    else
+        verbose 1 hg qrefresh "$@"
+        $run hg qrefresh "$@"
+    fi
+}
+
+qnew() {
+    if $dry_run ; then
+        $run hg qnew "$@"
+    else
+        verbose 1 hg qnew "$@"
+        $run hg qnew "$@"
+    fi
+}
+
+qfold() {
+    if $dry_run ; then
+        $run hg qfold "$@"
+    else
+        verbose 1 hg qfold "$@"
+        $run hg qfold "$@"
+    fi
+}
+
 ### command line #######################################################
 
 dry_run=false
+verbose=0
 
 while [ $# -gt 0 ]
 do
@@ -56,6 +117,7 @@ do
     shift
 
     case $option in
+        -v | --verbose) ((++verbose)) ; options+=(--verbose) ;;
         -n | --dry-run) dry_run=true ; options+=(--dry-run) ;;
         -h | --help) usage ; exit ;;
         --) break ;;
@@ -88,16 +150,17 @@ file="$mqroot/$patch"
 
 # Reset the changeset description.
 desc="$(hg tip --template '{desc}')"
-$run hg qrefresh --message=
+qrefresh --message=
 
 # Fold ( P ; Q ) into ( P + Q ).
-$run hg qpop
-$run hg qfold --keep "$patch"
+qpop
+qfold --keep "$patch"
 
 # Reverse ( Q ) to ( -Q ).
 if $dry_run ; then
     $run patch --directory="$hgroot" --strip=1 --reverse '<' "$file"
 else
+    verbose 1 patch --directory="$hgroot" --strip=1 --reverse '<' "$file"
     $run patch --directory="$hgroot" --strip=1 --reverse < "$file"
 fi
 
@@ -106,5 +169,6 @@ $run rm "$file"
 if $dry_run ; then
     $run hg qnew --message="\"$desc\"" "$patch"
 else
+    verbose 1 hg qnew --message="\"$desc\"" "$patch"
     $run hg qnew --message="$desc" "$patch"
 fi
