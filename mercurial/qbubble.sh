@@ -152,12 +152,13 @@ qimport() {
     fi
 }
 
-qfoldl() {
-    command qfoldl "${options[@]}" "$@"
-}
-
-qfoldr() {
-    command qfoldr "${options[@]}" "$@"
+qfold() {
+    if $dry_run ; then
+        $run hg qfold "$@"
+    else
+        verbose 1 hg qfold "$@"
+        $run hg qfold "$@"
+    fi
 }
 
 reverse() {
@@ -169,7 +170,6 @@ reverse() {
         hg diff --git --reverse --change $1 |
         qimport --quiet --git --name REVERSE-$1 -
     fi
-    qpush
 }
 
 duplicate() {
@@ -186,7 +186,6 @@ duplicate() {
 start_front() {
     a=$(hg qprev)
     b=$(hg qtop)
-    bcopy=COPY-$b
 
     verbose 0 "$a"
 
@@ -200,7 +199,8 @@ start_front() {
 resume_front() {
     a=$(hg qnext)
     b=$(hg qtop)
-    bcopy=$(hg qunapplied | head -n2 | tail -n1)
+
+    local bcopy=$(hg qunapplied | head -n2 | tail -n1)
 
     [ "$bcopy" = COPY-$b ] ||
         error "unexpected patch \"$bcopy\", expected COPY-$b"
@@ -208,51 +208,59 @@ resume_front() {
 
 abort_front() {
     qrefresh --exclude "$hgroot"
-    hg revert --all # { 0      | A B' }
-    qpop            # {        | 0 A B' }
-    qpush --move $a # { A      | 0 B' }
-    qpush           # { A 0    | B' }
-    qpush           # { A 0 B' }
-    qfoldl          # { A B }
+    hg revert --all # { 0   | A B' }
+    qpop            # {     | 0 A B' }
+    qpush --move $a # { A   | 0 B' }
+    qpush           # { A 0 | B' }
+    qfold COPY-$b   # { A B }
 }
 
 finish_front() {
-    reverse $b # { B" -B"      | A B' }
-    qpush      # { B" -B" A    | B' }
-    qpush      # { B" -B" A B' }
-    qfoldl     # { B" -B" A' }
-    qfoldr     # { B" A" }
-    qpop       # { B" | A" }
+    reverse $b # { B" | -B" A B' }
+
+    # Fold { -B" A B' } as A.
+    qpush                        # { B" -B"   | A B' }
+    qpush                        # { B" -B" A | B' }
+    qfold COPY-$b                # { B" -B" A' }
+    qrefresh --exclude "$hgroot" # { B" -B" 0 }
+    qnew COPY-$a                 # { B" -B" 0 A' }
+    qpop                         # { B" -B" 0 | A' }
+    qpop                         # { B" -B"   | 0 A' }
+    qpop                         # { B"       | -B" 0 A' }
+    qpush --move $a              # { B" 0     | -B" A' }
+    qfold REVERSE-$b             # { B" -B"   | A' }
+    qfold COPY-$a                # { B" A" }
+    qpop                         # { B" | A" }
 }
 
 start_back() {
     a=$(hg qtop)
     b=$(hg qnext)
-    acopy=COPY-$a
-    arev=REVERSE-$acopy
 
     verbose 0 "$b"
                                  # { A       | B }
-    qrefresh --exclude "$hgroot" # { 0       | B } -- "0" is a zero patch with A's metainfo
-    qnew $acopy                  # { 0 A'    | B }
+    qrefresh --exclude "$hgroot" # { 0       | B }
+    qnew COPY-$a                 # { 0 A'    | B }
     qpop                         # { 0       | A' B }
     qpop                         # {         | 0 A' B }
-    qpush --move $acopy          # { A'      | 0 B }
+    qpush --move COPY-$a         # { A'      | 0 B }
     qpush --move $b              # { A' B    | 0 }
-    reverse $acopy ||            # { A' B -A | 0 }
+    reverse COPY-$a              # { A' B    | -A 0 }
+    qpush ||                     # { A' B -A | 0 }
         error "resolve conflicts and qrefresh, \`$prog --continue' to resume."
 }
 
 resume_back() {
     a=$(hg qnext)
     b=$(hg qprev)
-    acopy=$(hg qapplied | tail -n3 | head -n1)
-    arev=$(hg qtop)
 
-    [ "$acopy" = COPY-$a        ] ||
+    local acopy=$(hg qapplied | tail -n3 | head -n1)
+    local arev=$(hg qtop)
+
+    [ "$acopy" = COPY-$a ] ||
         error "unexpected patch \"$acopy\", expected COPY-$a"
 
-    [ "$arev"  = REVERSE-$acopy ] ||
+    [ "$arev"  = REVERSE-COPY-$a ] ||
         error "unexpected patch \"$arev\", expected REVERSE-$acopy"
 }
 
@@ -261,22 +269,29 @@ abort_back() {
     qpop            # { A'   | B -A 0 }
     qpop            # {      | A' B -A 0 }
     qpush --move $a # { 0    | A' B -A }
-    qpush           # { 0 A' | B -A }
-    qfoldl          # { A    | B -A }
+    qfold COPY-$a   # { A    | B -A }
     qpush           # { A B  | -A }
-    qdelete $arev   # { A B }
+    qdelete REVERSE-COPY-$a # { A B }
 }
 
 finish_back() {
-    qpush            # { A' B -A 0 }
-    reverse $arev || # { A' B -A 0 --A }
-        error "cannot reverse $arev"
+    qpush                         # { A' B -A 0 }
+    reverse REVERSE-COPY-$a       # { A' B -A 0 | --A }
+    qfold REVERSE-REVERSE-COPY-$a # { A' B -A A" }
 
-    qfoldl # { A' B -A A" }
-    qpop   # { A' B -A | A" }
-    qfoldl # { A' B'   | A" }
-    qfoldr # { B"      | A" }
-    qpush  # { B" A" }
+    # Fold { A' B -A } as B.
+    qpop                         # { A' B -A  | A" }
+    qpop                         # { A' B     | -A A" }
+    qfold REVERSE-COPY-$a        # { A' B'    | A" }
+    qrefresh --exclude "$hgroot" # { A' 0     | A" }
+    qnew COPY-$b                 # { A' 0 B'  | A" }
+    qpop                         # { A' 0     | B' A" }
+    qpop                         # { A'       | 0 B' A" }
+    qpop                         # {          | A' 0 B' A" }
+    qpush --move $b              # { 0        | A' B' A" }
+    qfold COPY-$a                # { 0'       | B' A" }
+    qfold COPY-$b                # { B"       | A" }
+    qpush                        # { B" A" }
 }
 
 start() {
@@ -348,7 +363,6 @@ previous() {
 
 ### command line #######################################################
 
-options=()
 continue=false
 abort=false
 command=
@@ -378,9 +392,9 @@ do
         -r | --reverse) reverse=true ;;
         -c | --continue) continue=true ;;
         -A | --abort) abort=true ;;
-        -n | --dry-run) dry_run=true ; options+=(--dry-run) ;;
-        -v | --verbose) ((++verbose)) ; options+=(--verbose) ;;
-        -q | --quiet) ((--verbose)) ; options+=(--quiet) ;;
+        -n | --dry-run) dry_run=true ;;
+        -v | --verbose) ((++verbose)) ;;
+        -q | --quiet) ((--verbose)) ;;
         -h | --help) usage ; exit ;;
         --) break ;;
         -*) bad_option $option ;;
@@ -401,12 +415,6 @@ if $dry_run ; then
 fi
 
 ### main ###############################################################
-
-which qfoldl >/dev/null 2>&1 ||
-    error "qfoldl not found"
-
-which qfoldr >/dev/null 2>&1 ||
-    error "qfoldr not found"
 
 hgroot="$(hg root)" ||
     error "not in a mercurial repository"
