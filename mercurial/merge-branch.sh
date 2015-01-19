@@ -14,6 +14,7 @@ Merge the specified branch.
 options:
     -c, --continue  Resume after conflict resolution.
     -A, --abort     Abort the operation.
+    -C, --cwd DIR   Change working directory.
     -n, --dry-run   Print commands instead of executing them.
     -v, --verbose   Be verbose.
     -h, --help      Display this message.
@@ -33,6 +34,10 @@ bad_usage() {
 
 bad_option() {
     bad_usage "unrecognized option \`$1'"
+}
+
+missing_arg() {
+    bad_usage "option \`$1' requires an argument"
 }
 
 verbose() {
@@ -101,6 +106,7 @@ abort() {
 options=()
 continue=false
 abort=false
+cwd=
 verbose=0
 dry_run=false
 
@@ -110,6 +116,12 @@ do
     shift
 
     case $option in
+        -C | --cwd)
+            [ $# -gt 0 ] || missing_arg "$option"
+            cwd="$1"
+            shift
+            ;;
+
         -c | --continue) continue=true ;;
         -A | --abort) abort=true ;;
         -n | --dry-run) dry_run=true ; options+=(--dry-run) ;;
@@ -136,6 +148,14 @@ if $dry_run ; then
 fi
 
 ### main ###############################################################
+
+if [ -n "$cwd" ] ; then
+    if $dry_run ; then
+        $run cd "$cwd"
+    fi
+
+    cd "$cwd"
+fi
 
 tmpdir="${TMPDIR:-/tmp}"
 
