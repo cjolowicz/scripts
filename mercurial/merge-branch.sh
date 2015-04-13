@@ -53,10 +53,10 @@ print_commit_message() {
         sed -n 's/^changeset:.*:/-r /p'
     ))
 
-    [ ${#revisions[@]} -gt 0 ] ||
-        error "cannot determine changesets to be merged"
-
     echo "Merge $branch branch."
+
+    [ ${#revisions[@]} -gt 0 ] || return 0
+
     echo
 
     hg log --template ' * [{branch}/{node|short}] {desc|firstline}\n' "${revisions[@]}" |
