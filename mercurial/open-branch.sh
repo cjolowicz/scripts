@@ -15,6 +15,7 @@ Open the specified branch.
 
 Options:
     -n, --dry-run   Print commands instead of executing them.
+    -f, --force     Set branch name even if it shadows an existing branch.
     -h, --help      Display this message.
 "
 }
@@ -52,11 +53,16 @@ get_parent() {
 
 open_branch() {
     local branch="$1"
+    local options=()
+
+    if $force ; then
+        options+=(--force)
+    fi
 
     if $dry_run ; then
-        $run hg branch --quiet "\"$branch\""
+        $run hg branch --quiet "${options[@]}" "\"$branch\""
     else
-        $run hg branch --quiet "$branch"
+        $run hg branch --quiet "${options[@]}" "$branch"
     fi
 
     if $dry_run ; then
@@ -69,6 +75,7 @@ open_branch() {
 ### command line #######################################################
 
 dry_run=false
+force=false
 
 while [ $# -gt 0 ]
 do
@@ -77,6 +84,7 @@ do
 
     case $option in
         -n | --dry-run) dry_run=true ;;
+        -f | --force) force=true ;;
         -h | --help) usage ; exit ;;
         --) break ;;
         -*) bad_option $option ;;
