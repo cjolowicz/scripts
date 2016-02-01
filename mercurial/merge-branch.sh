@@ -15,6 +15,7 @@ options:
     -c, --continue  Resume after conflict resolution.
     -A, --abort     Abort the operation.
     -C, --cwd DIR   Change working directory.
+    -D, --discard   Discard all changes.
     -n, --dry-run   Print commands instead of executing them.
     -v, --verbose   Be verbose.
     -h, --help      Display this message.
@@ -76,8 +77,13 @@ save_commit_message() {
 start() {
     save_commit_message
 
-    $run hg merge "$branch" ||
-        error "resolve conflicts, \`$prog --continue' to resume."
+    if $discard ; then
+        $run debugsetparents $local $other ||
+            error "failed"
+    else
+        $run hg merge "$branch" ||
+            error "resolve conflicts, \`$prog --continue' to resume."
+    fi
 }
 
 resume() {
@@ -107,6 +113,7 @@ options=()
 continue=false
 abort=false
 cwd=
+discard=false
 verbose=0
 dry_run=false
 
@@ -124,6 +131,7 @@ do
 
         -c | --continue) continue=true ;;
         -A | --abort) abort=true ;;
+        -D | --discard) discard=true ;;
         -n | --dry-run) dry_run=true ; options+=(--dry-run) ;;
         -v | --verbose) ((++verbose)) ; options+=(--verbose) ;;
         -h | --help) usage ; exit ;;
