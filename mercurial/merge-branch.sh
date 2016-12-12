@@ -78,7 +78,7 @@ start() {
     save_commit_message
 
     if $discard ; then
-        $run debugsetparents $local $other ||
+        $run hg debugsetparents $local $other ||
             error "failed"
     else
         $run hg merge "$branch" ||
