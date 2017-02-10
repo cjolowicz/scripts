@@ -14,6 +14,8 @@ Merge the specified branch.
 options:
     -c, --continue  Resume after conflict resolution.
     -A, --abort     Abort the operation.
+    -C, --cwd DIR   Change working directory.
+    -D, --discard   Discard all changes.
     -n, --dry-run   Print commands instead of executing them.
     -v, --verbose   Be verbose.
     -h, --help      Display this message.
@@ -35,6 +37,10 @@ bad_option() {
     bad_usage "unrecognized option \`$1'"
 }
 
+missing_arg() {
+    bad_usage "option \`$1' requires an argument"
+}
+
 verbose() {
     local level=$1
     shift
@@ -48,10 +54,10 @@ print_commit_message() {
         sed -n 's/^changeset:.*:/-r /p'
     ))
 
-    [ ${#revisions[@]} -gt 0 ] ||
-        error "cannot determine changesets to be merged"
-
     echo "Merge $branch branch."
+
+    [ ${#revisions[@]} -gt 0 ] || return 0
+
     echo
 
     hg log --template ' * [{branch}/{node|short}] {desc|firstline}\n' "${revisions[@]}" |
@@ -71,8 +77,13 @@ save_commit_message() {
 start() {
     save_commit_message
 
-    $run hg merge "$branch" ||
-        error "resolve conflicts, \`$prog --continue' to resume."
+    if $discard ; then
+        $run hg debugsetparents $local $other ||
+            error "failed"
+    else
+        $run hg merge "$branch" ||
+            error "resolve conflicts, \`$prog --continue' to resume."
+    fi
 }
 
 resume() {
@@ -101,6 +112,8 @@ abort() {
 options=()
 continue=false
 abort=false
+cwd=
+discard=false
 verbose=0
 dry_run=false
 
@@ -110,8 +123,15 @@ do
     shift
 
     case $option in
+        -C | --cwd)
+            [ $# -gt 0 ] || missing_arg "$option"
+            cwd="$1"
+            shift
+            ;;
+
         -c | --continue) continue=true ;;
         -A | --abort) abort=true ;;
+        -D | --discard) discard=true ;;
         -n | --dry-run) dry_run=true ; options+=(--dry-run) ;;
         -v | --verbose) ((++verbose)) ; options+=(--verbose) ;;
         -h | --help) usage ; exit ;;
@@ -136,6 +156,14 @@ if $dry_run ; then
 fi
 
 ### main ###############################################################
+
+if [ -n "$cwd" ] ; then
+    if $dry_run ; then
+        $run cd "$cwd"
+    fi
+
+    cd "$cwd"
+fi
 
 tmpdir="${TMPDIR:-/tmp}"
 

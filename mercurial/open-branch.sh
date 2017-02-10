@@ -15,6 +15,7 @@ Open the specified branch.
 
 Options:
     -n, --dry-run   Print commands instead of executing them.
+    -f, --force     Set branch name even if it shadows an existing branch.
     -h, --help      Display this message.
 "
 }
@@ -38,13 +39,30 @@ bad_option() {
     bad_usage "unrecognized option \`$1'"
 }
 
+get_parent() {
+    local parents=($(hg parents --template ' {node|short}'))
+
+    if [ ${#parents[@]} -gt 1 ] ; then
+        error "working directory has multiple parents"
+    elif [ ${#parents[@]} -eq 0 ] ; then
+        echo null
+    else
+        echo "${parents[0]}"
+    fi
+}
+
 open_branch() {
     local branch="$1"
+    local options=()
+
+    if $force ; then
+        options+=(--force)
+    fi
 
     if $dry_run ; then
-        $run hg branch --quiet "\"$branch\""
+        $run hg branch --quiet "${options[@]}" "\"$branch\""
     else
-        $run hg branch --quiet "$branch"
+        $run hg branch --quiet "${options[@]}" "$branch"
     fi
 
     if $dry_run ; then
@@ -57,6 +75,7 @@ open_branch() {
 ### command line #######################################################
 
 dry_run=false
+force=false
 
 while [ $# -gt 0 ]
 do
@@ -65,6 +84,7 @@ do
 
     case $option in
         -n | --dry-run) dry_run=true ;;
+        -f | --force) force=true ;;
         -h | --help) usage ; exit ;;
         --) break ;;
         -*) bad_option $option ;;
@@ -80,19 +100,14 @@ fi
 
 ### main ###############################################################
 
-parents=($(hg parents --template ' {node|short}'))
-
-[ ${#parents[@]} -gt 0 ] || error "working directory has no parent"
-[ ${#parents[@]} -eq 1 ] || error "working directory has multiple parents"
-
-parent=${parents[0]}
+parent="$(get_parent)"
 
 for branch ; do
     if ! $dry_run ; then
         info "$branch"
     fi
 
-    if [ "$parent" != "$(hg branch)" ] ; then
+    if [ "$parent" != "$(get_parent)" ] ; then
 	if $dry_run ; then
 	    $run hg update --quiet "\"$parent\""
 	else

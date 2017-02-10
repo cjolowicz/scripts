@@ -3,8 +3,8 @@
 # List all files in the stow directory which are not linked to from
 # the target directory.
 
-stowdir=.
-targetdir=..
+: ${stowdir=.}
+: ${targetdir=..}
 
 find $stowdir -mindepth 1 -maxdepth 1 -type d -name '[^.]*' |
 while read dir ; do
