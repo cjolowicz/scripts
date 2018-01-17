@@ -7,6 +7,9 @@ from pydub import AudioSegment
 import sys
 import math
 import os.path
+import argparse
+
+sys.excepthook = lambda exctype, value, traceback: sys.stderr.write('%s\n' % value)
 
 default_ticks = 60 * 60 * 1000 # 1h in milliseconds
 
@@ -33,5 +36,15 @@ def splitaudio(filename, ticks):
         segment.export(outfile, format=filetype)
         verbose(outfile)
 
-for filename in sys.argv[1:]:
-    splitaudio(filename, default_ticks)
+def main():
+    parser = argparse.ArgumentParser(description='Split audio into segments of a given length.')
+    parser.add_argument('files', metavar='FILE', nargs='+', help='an input file containing audio')
+    parser.add_argument('-t', '--ticks', metavar='N', type=int, default=default_ticks,
+                        help='split audio every N milliseconds (default: %d)' % default_ticks)
+
+    args = parser.parse_args()
+    for filename in args.files:
+        splitaudio(filename, args.ticks)
+
+if __name__ == '__main__':
+    main()
