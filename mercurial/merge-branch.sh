@@ -66,7 +66,7 @@ print_commit_message() {
 
 save_commit_message() {
     if $dry_run ; then
-        $run cat "<<EOF > $logfile"
+        $run "cat <<EOF > $logfile"
         print_commit_message
         $run 'EOF'
     else
