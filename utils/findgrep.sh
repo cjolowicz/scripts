@@ -41,9 +41,21 @@ findopts+=("${glob[@]}" "${exclude[@]}" -type f -print0)
 
 [ $# -gt 0 ] || set -- .
 
+if gfind </dev/null >/dev/null 2>&1 ; then
+    find=gfind
+else
+    find=find
+fi
+
+if gxargs </dev/null >/dev/null 2>&1 ; then
+    xargs=gxargs
+else
+    xargs=xargs
+fi
+
 for dir
 do
-    find "$dir" "${findopts[@]}"
+    $find "$dir" "${findopts[@]}"
 done |
-xargs -0r grep -n "${grepopts[@]}" "$grepexpr" . |
+$xargs -0r grep -n "${grepopts[@]}" "$grepexpr" . |
 LESS=FSRX less
