@@ -14,6 +14,7 @@ usage: $prog [options] [branch]..
 Open the specified branch.
 
 Options:
+        --cwd DIR   Change working directory.
     -n, --dry-run   Print commands instead of executing them.
     -f, --force     Set branch name even if it shadows an existing branch.
     -h, --help      Display this message.
@@ -37,6 +38,10 @@ bad_usage() {
 
 bad_option() {
     bad_usage "unrecognized option \`$1'"
+}
+
+missing_arg() {
+    bad_usage "option \`$1' requires an argument"
 }
 
 get_parent() {
@@ -74,6 +79,7 @@ open_branch() {
 
 ### command line #######################################################
 
+cwd=
 dry_run=false
 force=false
 
@@ -83,6 +89,12 @@ do
     shift
 
     case $option in
+        --cwd)
+            [ $# -gt 0 ] || missing_arg "$option"
+            cwd="$1"
+            shift
+            ;;
+
         -n | --dry-run) dry_run=true ;;
         -f | --force) force=true ;;
         -h | --help) usage ; exit ;;
@@ -99,6 +111,14 @@ if $dry_run ; then
 fi
 
 ### main ###############################################################
+
+if [ -n "$cwd" ] ; then
+    if $dry_run ; then
+        $run cd "$cwd"
+    fi
+
+    cd "$cwd"
+fi
 
 parent="$(get_parent)"
 
