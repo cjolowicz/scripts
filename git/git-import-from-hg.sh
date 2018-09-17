@@ -86,6 +86,7 @@ commit() {
 	git_commit_options+=(--date="$date")
     fi
 
+    $run git "${git_options[@]}" add --all
     $run git "${git_options[@]}" commit "${git_commit_options[@]}"
 
     if $edit
