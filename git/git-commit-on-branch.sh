@@ -2,13 +2,16 @@
 
 set -e
 
-if [ $# -gt 0 ]
-then
-    branch="$1"
-    shift
-else
-    branch=master
-fi
+case $1 in
+    '' | '-'*)
+        branch=master
+        ;;
+
+    *)
+        branch="$1"
+        shift
+        ;;
+esac
 
 current=$(git rev-parse --abbrev-ref HEAD)
 
