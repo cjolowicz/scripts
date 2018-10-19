@@ -3,8 +3,8 @@
 set -e
 
 program=$(basename $0)
-branch=temp-amending
-resume=false
+branch=$program-branch
+tag=$program-commit
 
 ### functions ##########################################################
 
@@ -13,10 +13,14 @@ usage() {
 Amend the specified git commit.
 
 options:
-    -e, --edit      Edit the commit message.
-    -c, --continue  Resume operation after performing changes.
-    -C, --cwd DIR   Change working directory.
-    -h, --help      Display this message.
+    -e, --edit          Edit the commit message.
+    -m, --message TEXT  Change the commit message.
+    -c, --continue      Resume operation after performing changes.
+    -a, --abort         Abort operation.
+    -C, --cwd DIR       Change working directory.
+    -v, --verbose       Be verbose.
+    -n, --dry-run       Print commands instead of executing them.
+    -h, --help          Display this message.
 "
 }
 
@@ -31,21 +35,23 @@ bad_usage() {
     exit 1
 }
 
-bad_option() {
-    bad_usage "unrecognized option \`$1'"
-}
-
 missing_arg() {
     bad_usage "option \`$1' requires an argument"
+}
+
+verbose_git() {
+    echo git "$@"
+    command git "$@"
 }
 
 ### command line #######################################################
 
 edit=false
-resume=false
+message=
+continue=false
 cwd=
-commit=
-
+dry_run=false
+verbose=false
 while [ $# -gt 0 ]
 do
     option="$1"
@@ -58,21 +64,74 @@ do
             shift
             ;;
 
-        -c | --continue) resume=true ;;
-        -e | --edit) edit=true ;;
-        -h | --help) usage ; exit ;;
-        --) break ;;
-        -*) bad_option $option ;;
-        *) set -- "$option" "$@" ; break ;;
+        -m | --message)
+            [ $# -gt 0 ] || missing_arg "$option"
+            message="$1"
+            shift
+            ;;
+
+        -c | --continue)
+	    continue=true
+	    ;;
+
+        -a | --abort)
+	    abort=true
+	    ;;
+
+        -e | --edit)
+	    edit=true
+	    ;;
+
+        -n | --dry-run)
+            dry_run=true
+            ;;
+
+        -v | --verbose)
+            verbose=true
+            ;;
+
+        -h | --help)
+	    usage
+	    exit
+	    ;;
+
+        --)
+	    break
+	    ;;
+
+        -*)
+	    bad_usage "unrecognized option \`$option'"
+	    ;;
+
+        *)
+	    set -- "$option" "$@"
+	    break
+	    ;;
     esac
 done
 
-[ $# -gt 0 ] || bad_usage "no commit specified"
+if ! $continue && ! $abort
+then
+    if [ $# -gt 0 ]
+    then
+	argument="$1"
+	shift
+    else
+	argument=HEAD
+    fi
+fi
 
-commit="$1"
-shift
+[ $# -eq 0 ] || bad_usage "unrecognized argument \`$1'"
 
-[ $# -eq 0 ] || bad_option "$1"
+if $dry_run
+then
+    git='echo git'
+elif $verbose
+then
+    git=verbose_git
+else
+    git=git
+fi
 
 ### main ###############################################################
 
@@ -80,24 +139,88 @@ if [ -n "$cwd" ] ; then
     cd "$cwd"
 fi
 
+branch_of() {
+    branches=($(git branch --contains $1))
+
+    if [ ${#branches[@]} -eq 1 ]
+    then
+	echo ${branches[0]}
+    fi
+}
+
 setup() {
-    git checkout -b $branch ${commit}~1
-    git cherry-pick $commit
+    status=$(git status --porcelain) && [ -z "$status" ] ||
+	error "there are uncommitted changes in the working directory"
+
+    in_progress=$(git rev-parse --verify --quiet $branch)
+    [ -z "$in_progress" ] ||
+	error "already in progress, use --continue or --abort"
+
+    commit=$(git rev-parse --verify --quiet "$argument") ||
+	error "cannot parse commit \`$argument'"
+
+    $git tag $tag $commit
+
+    parent=$(git rev-parse --verify --quiet ${commit}~)
+
+    if [ -n "$parent" ]
+    then
+	$git checkout --quiet -b $branch $parent
+    else
+	$git checkout --quiet --orphan $branch
+    fi
+
+    $git cherry-pick --quiet $commit
 }
 
-resume() {
-    git rebase --onto $branch $commit master
-    git branch --delete $branch
+continue_() {
+    if $dry_run
+    then
+	if [ -n "$commit" ]
+	then
+	    branch_of=$(branch_of $commit)
+	    branch_of=${branch_of:-'<branch>'}
+	else
+	    commit='<commit>'
+	    branch_of='<branch>'
+	fi
+    else
+	commit=$(git rev-parse --quiet --verify $tag) ||
+	    error "cannot determine amended commit from tag $tag"
+	branch_of=$(branch_of $commit)
+
+	[ -n "$branch_of" ] ||
+	    error "cannot determine branch of commit $commit"
+    fi
+
+    $git rebase --quiet --onto $branch $commit $branch_of
+    $git branch --quiet --delete $branch
 }
 
-if $edit ; then
+abort() {
+    $git cherry-pick --quiet --abort || true
+    $git checkout --quiet $(branch_of $tag) || true
+    $git branch --quiet --delete $branch || true
+    $git tag --delete $tag || true
+}
+
+if $abort
+then
+    abort
+elif $continue ; then
+    $git commit --amend -aC $tag
+    continue_
+elif $message
+then
     setup
-    git commit --amend --edit
-    resume
-elif $resume ; then
-    git commit --amend -aC $commit
-    resume
+    $git commit --amend --message="$message"
+    continue_
+elif $edit
+then
+    setup
+    $git commit --amend --edit
+    continue_
 else
     setup
-    echo "Modify the commit, then invoke \`$program --continue $commit'." >&2
+    echo "Modify the commit, then invoke \`$program --continue'." >&2
 fi
