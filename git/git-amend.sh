@@ -25,13 +25,13 @@ options:
 }
 
 error() {
-    echo "$prog: $*" >&2
+    echo "$program: $*" >&2
     exit 1
 }
 
 bad_usage() {
-    echo "$prog: $*" >&2
-    echo "Try \`$prog --help' for more information." >&2
+    echo "$program: $*" >&2
+    echo "Try \`$program --help' for more information." >&2
     exit 1
 }
 
@@ -48,6 +48,7 @@ verbose_git() {
 
 edit=false
 message=
+abort=false
 continue=false
 cwd=
 dry_run=false
@@ -71,16 +72,16 @@ do
             ;;
 
         -c | --continue)
-	    continue=true
-	    ;;
+            continue=true
+            ;;
 
         -a | --abort)
-	    abort=true
-	    ;;
+            abort=true
+            ;;
 
         -e | --edit)
-	    edit=true
-	    ;;
+            edit=true
+            ;;
 
         -n | --dry-run)
             dry_run=true
@@ -91,22 +92,22 @@ do
             ;;
 
         -h | --help)
-	    usage
-	    exit
-	    ;;
+            usage
+            exit
+            ;;
 
         --)
-	    break
-	    ;;
+            break
+            ;;
 
         -*)
-	    bad_usage "unrecognized option \`$option'"
-	    ;;
+            bad_usage "unrecognized option \`$option'"
+            ;;
 
         *)
-	    set -- "$option" "$@"
-	    break
-	    ;;
+            set -- "$option" "$@"
+            break
+            ;;
     esac
 done
 
@@ -114,10 +115,10 @@ if ! $continue && ! $abort
 then
     if [ $# -gt 0 ]
     then
-	argument="$1"
-	shift
+        argument="$1"
+        shift
     else
-	argument=HEAD
+        argument=HEAD
     fi
 fi
 
@@ -140,24 +141,34 @@ if [ -n "$cwd" ] ; then
 fi
 
 branch_of() {
-    branches=($(git branch --contains $1))
+    local branches=($(
+	git for-each-ref --contains $1 |
+            while read ref type file
+            do
+		dirname=$(dirname "$file")
+		if [ "$type" = commit -a "$dirname" = refs/heads ]
+		then
+		    basename "$file"
+		fi
+            done))
 
     if [ ${#branches[@]} -eq 1 ]
     then
-	echo ${branches[0]}
+        echo ${branches[0]}
     fi
 }
 
 setup() {
     status=$(git status --porcelain) && [ -z "$status" ] ||
-	error "there are uncommitted changes in the working directory"
+        error "there are uncommitted changes in the working directory"
 
-    in_progress=$(git rev-parse --verify --quiet $branch)
-    [ -z "$in_progress" ] ||
-	error "already in progress, use --continue or --abort"
+    if in_progress=$(git rev-parse --verify --quiet $branch) && [ -n "$in_progress" ]
+    then
+        error "already in progress, use --continue or --abort"
+    fi
 
     commit=$(git rev-parse --verify --quiet "$argument") ||
-	error "cannot parse commit \`$argument'"
+        error "cannot parse commit \`$argument'"
 
     $git tag $tag $commit
 
@@ -165,9 +176,9 @@ setup() {
 
     if [ -n "$parent" ]
     then
-	$git checkout --quiet -b $branch $parent
+        $git checkout --quiet -b $branch $parent
     else
-	$git checkout --quiet --orphan $branch
+        $git checkout --quiet --orphan $branch
     fi
 
     $git cherry-pick --quiet $commit
@@ -176,32 +187,43 @@ setup() {
 continue_() {
     if $dry_run
     then
-	if [ -n "$commit" ]
-	then
-	    branch_of=$(branch_of $commit)
-	    branch_of=${branch_of:-'<branch>'}
-	else
-	    commit='<commit>'
-	    branch_of='<branch>'
-	fi
+        if [ -n "$commit" ]
+        then
+            branch_of=$(branch_of $commit)
+            branch_of=${branch_of:-'<branch>'}
+        else
+            commit='<commit>'
+            branch_of='<branch>'
+        fi
     else
-	commit=$(git rev-parse --quiet --verify $tag) ||
-	    error "cannot determine amended commit from tag $tag"
-	branch_of=$(branch_of $commit)
+        commit=$(git rev-parse --quiet --verify $tag) ||
+            error "cannot determine amended commit from tag $tag"
+        branch_of=$(branch_of $commit)
 
-	[ -n "$branch_of" ] ||
-	    error "cannot determine branch of commit $commit"
+        [ -n "$branch_of" ] ||
+            error "cannot determine branch of commit $commit"
     fi
 
     $git rebase --quiet --onto $branch $commit $branch_of
     $git branch --quiet --delete $branch
+    $git tag --delete $tag >/dev/null
 }
 
 abort() {
     $git cherry-pick --quiet --abort || true
-    $git checkout --quiet $(branch_of $tag) || true
+
+    commit=$(git rev-parse --quiet --verify $tag) || true
+    if [ -n "$commit" ]
+    then
+        branch_of=$(branch_of $commit)
+        if [ -n $branch_of ]
+        then
+            $git checkout --quiet $(branch_of $commit) || true
+        fi
+    fi
+
     $git branch --quiet --delete $branch || true
-    $git tag --delete $tag || true
+    $git tag --delete $tag >/dev/null || true
 }
 
 if $abort
@@ -210,7 +232,7 @@ then
 elif $continue ; then
     $git commit --amend -aC $tag
     continue_
-elif $message
+elif [ -n "$message" ]
 then
     setup
     $git commit --amend --message="$message"
