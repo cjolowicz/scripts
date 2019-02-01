@@ -13,6 +13,7 @@ Fixup the specified git commit.
 options:
     -a, --all           Stage modified and deleted files.
     -p, --patch         Choose patches interactively.
+    -s, --stash         Stash changes during rebase.
     -v, --verbose       Be verbose.
     -n, --dry-run       Print commands instead of executing them.
     -h, --help          Display this message.
@@ -38,8 +39,9 @@ verbose_git() {
 ### command line #######################################################
 
 commit_options=()
-dry_run=false
+stash=false
 verbose=false
+dry_run=false
 
 while [ $# -gt 0 ]
 do
@@ -53,6 +55,10 @@ do
 
         -p | --patch)
             commit_options+=(--patch)
+            ;;
+
+        -s | --stash)
+            stash=true
             ;;
 
         -v | --verbose)
@@ -87,12 +93,13 @@ do
     esac
 done
 
-if [ $# -gt 0 ]
+if [ $# -eq 0 ]
 then
-    argument="$1"
+    commit=HEAD
+elif [ ! -e "$1" ]
+then
+    commit="$1"
     shift
-else
-    argument=HEAD
 fi
 
 if $dry_run
@@ -107,8 +114,18 @@ fi
 
 ### main ###############################################################
 
-commit=$(git rev-parse $argument)
+commit=$(git rev-parse $commit)
 
 $git commit ${commit_options[@]+"${commit_options[@]}"} --fixup=$commit "$@"
 
+if $stash
+then
+    git stash
+fi
+
 GIT_EDITOR=true $git rebase --interactive $commit^
+
+if $stash
+then
+    git stash pop
+fi
