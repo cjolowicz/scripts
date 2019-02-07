@@ -39,6 +39,7 @@ verbose_git() {
 ### command line #######################################################
 
 commit_options=()
+all=false
 stash=false
 verbose=false
 dry_run=false
@@ -51,6 +52,7 @@ do
     case $option in
         -a | --all)
             commit_options+=(--all)
+            all=true
             ;;
 
         -p | --patch)
@@ -113,6 +115,12 @@ else
 fi
 
 ### main ###############################################################
+
+if ! $stash && ! $all
+then
+    status=$(git status --porcelain) && [ -z "$status" ] ||
+        error "there are uncommitted changes in the working directory"
+fi
 
 commit=$(git rev-parse $commit)
 
