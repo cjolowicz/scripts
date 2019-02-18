@@ -11,6 +11,7 @@ usage() {
 Fixup the specified git commit.
 
 options:
+    -#, --last=#        Fix up the (#th) last commit to modify each file
     -a, --all           Stage modified and deleted files.
     -p, --patch         Choose patches interactively.
     -s, --stash         Stash changes during rebase.
@@ -31,6 +32,10 @@ bad_usage() {
     exit 1
 }
 
+missing_arg() {
+    bad_usage "option \`$1' requires an argument"
+}
+
 verbose_git() {
     echo git "$@"
     command git "$@"
@@ -39,6 +44,7 @@ verbose_git() {
 ### command line #######################################################
 
 commit_options=()
+last=
 all=false
 stash=false
 verbose=false
@@ -50,8 +56,21 @@ do
     shift
 
     case $option in
+        -[0-9])
+            last=${option:1}
+            ;;
+
+        --last)
+            [ $# -gt 0 ] || missing_arg "$option"
+            last="$1"
+            shift
+            ;;
+
+        --last=*)
+            last="${option#--last=}"
+            ;;
+
         -a | --all)
-            commit_options+=(--all)
             all=true
             ;;
 
@@ -95,12 +114,25 @@ do
     esac
 done
 
-if [ $# -gt 0 ] && [ ! -e "$1" ]
+if [ -n "$last" ]
 then
-    commit="$1"
-    shift
+    if ! [ "$last" -eq "$last" ]
+    then
+        bad_usage "--last=$last must be a number"
+    fi
 else
-    commit=HEAD
+    if [ $# -gt 0 ] && [ ! -e "$1" ]
+    then
+        commit="$1"
+        shift
+    else
+        commit=HEAD
+    fi
+
+    if $all
+    then
+        commit_options+=(--all)
+    fi
 fi
 
 if $dry_run
@@ -114,6 +146,48 @@ else
 fi
 
 ### main ###############################################################
+
+if [ -n "$last" ]
+then
+    if [ $# -eq 0 ] && $all
+    then
+        set -- $(git diff --name-only)
+    fi
+
+    if [ $# -eq 0 ]
+    then
+        exit
+    fi
+
+    commits=()
+
+    for file
+    do
+        commit=$(git rev-list -$last HEAD "$file" | tail -n1)
+
+        $git commit ${commit_options[@]+"${commit_options[@]}"} --fixup=$commit "$file"
+
+        commits+=($commit)
+    done
+
+    oldest=$(
+        git rev-list --reverse --topo-order ${commits[@]} |
+            grep ${commits[@]/#/-e } --max-count=1)
+
+    if $stash
+    then
+        $git stash
+    fi
+
+    GIT_EDITOR=true $git rebase --interactive $oldest^
+
+    if $stash
+    then
+        $git stash stop
+    fi
+
+    exit
+fi
 
 if ! $stash && ! $all
 then
