@@ -95,13 +95,12 @@ do
     esac
 done
 
-if [ $# -eq 0 ]
-then
-    commit=HEAD
-elif [ ! -e "$1" ]
+if [ $# -gt 0 ] && [ ! -e "$1" ]
 then
     commit="$1"
     shift
+else
+    commit=HEAD
 fi
 
 if $dry_run
