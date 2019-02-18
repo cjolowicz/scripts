@@ -127,12 +127,12 @@ $git commit ${commit_options[@]+"${commit_options[@]}"} --fixup=$commit "$@"
 
 if $stash
 then
-    git stash
+    $git stash
 fi
 
 GIT_EDITOR=true $git rebase --interactive $commit^
 
 if $stash
 then
-    git stash pop
+    $git stash pop
 fi
