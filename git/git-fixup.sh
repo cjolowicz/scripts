@@ -195,7 +195,7 @@ then
         error "there are uncommitted changes in the working directory"
 fi
 
-commit=$(git rev-parse $commit)
+commit=$(git rev-parse "$commit")
 
 $git commit ${commit_options[@]+"${commit_options[@]}"} --fixup=$commit "$@"
 
