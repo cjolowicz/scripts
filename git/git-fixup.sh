@@ -179,7 +179,14 @@ then
         $git stash
     fi
 
-    GIT_EDITOR=true $git rebase --interactive $oldest^
+    root=$(git rev-list --max-parents=0 HEAD)
+
+    if [ $oldest = $root ]
+    then
+        GIT_EDITOR=true $git rebase --interactive --root
+    else
+        GIT_EDITOR=true $git rebase --interactive $oldest^
+    fi
 
     if $stash
     then
