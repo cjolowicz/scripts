@@ -6,8 +6,8 @@ nmanagers=1
 nworkers=3
 
 leader=node1
-managers=node{1..$nmanagers}
-workers=node{$((nmanagers + 1))..$((nmanagers + nworkers))}
+managers=($(seq --format=node%.f $nmanagers))
+workers=($(seq --format=node%.f $((nmanagers + 1)) $((nmanagers + nworkers))))
 
 for node in ${managers[@]} ${workers[@]}
 do
