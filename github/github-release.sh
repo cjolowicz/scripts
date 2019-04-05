@@ -2,28 +2,33 @@
 
 case $1 in
     -n | --dry-run)
-        hub='echo hub'
+        dry_run=true
         shift
         ;;
 
     -h | --help)
-        echo "$0 VERSION"
+        echo "$0 VERSION.."
         exit
         ;;
 
     *)
-        hub=hub
+        dry_run=false
         ;;
 esac
 
-version="$1"
-shift
-
 get_message() {
-    echo v$version
+    echo v$1
     echo
-    sed -nr "/^## \\[?$version\\]? - /,/^(## |\\[)/p" CHANGELOG.md |
+    sed -nr "/^## \\[?$1\\]? - /,/^(## |\\[)/p" CHANGELOG.md |
         sed '1d;$d'
 }
 
-$hub release create --message="$(get_message)" v$version
+for version
+do
+    if $dry_run
+    then
+        echo "hub release create --message=\"$(get_message $version)\" v$version"
+    else
+        hub release create --message="$(get_message $version)" v$version
+    fi
+done
