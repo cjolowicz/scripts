@@ -206,9 +206,9 @@ fi
 
 if $dry_run
 then
-    echo "eval \$(docker-machine env $leader)"
+    echo "eval \$(docker-machine env --shell bash $leader)"
 else
-    eval $(docker-machine env $leader)
+    eval $(docker-machine env --shell bash $leader)
 fi
 
 $docker swarm init --advertise-addr=$leader_ip
@@ -233,9 +233,9 @@ for node in ${managers[@]:1}
 do
     if $dry_run
     then
-        echo "eval \$(docker-machine env $node)"
+        echo "eval \$(docker-machine env --shell bash $node)"
     else
-        eval $(docker-machine env $node)
+        eval $(docker-machine env --shell bash $node)
     fi
 
     $docker swarm join --token=$manager_token $leader_ip:2377
@@ -245,9 +245,9 @@ for node in ${workers[@]}
 do
     if $dry_run
     then
-        echo "eval \$(docker-machine env $node)"
+        echo "eval \$(docker-machine env --shell bash $node)"
     else
-        eval $(docker-machine env $node)
+        eval $(docker-machine env --shell bash $node)
     fi
 
     $docker swarm join --token=$worker_token $leader_ip:2377
