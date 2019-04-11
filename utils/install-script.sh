@@ -1,6 +1,6 @@
 #!/bin/bash
 
-bindir=$HOME/bin
+bindir=$HOME/.local/bin
 
 mkdir -p $bindir
 
