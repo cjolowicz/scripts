@@ -190,7 +190,10 @@ leader=${managers[0]}
 
 for node in ${managers[@]} ${workers[@]}
 do
-    $docker_machine create --driver="$driver" $node
+    if ! docker-machine ls | grep -q $node
+    then
+        $docker_machine create --driver="$driver" $node
+    fi
 done
 
 if $dry_run
