@@ -21,6 +21,13 @@ get_message() {
     echo
     sed -nr "/^## \\[?$1\\]? - /,/^(## |\\[)/p" CHANGELOG.md |
         sed '1d;$d'
+
+    local url=$(sed -n "s/^\\[${1//./\\.}]: *//p" CHANGELOG.md)
+
+    if [ -n "$url" ]
+    then
+        echo "[See commits]($url)"
+    fi
 }
 
 for version
