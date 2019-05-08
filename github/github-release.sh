@@ -32,10 +32,17 @@ get_message() {
 
 for version
 do
+    if hub release | grep -q "$version"
+    then
+        command=edit
+    else
+        command=create
+    fi
+
     if $dry_run
     then
-        echo "hub release create --message=\"$(get_message $version)\" v$version"
+        echo "hub release $command --message=\"$(get_message $version)\" v$version"
     else
-        hub release create --message="$(get_message $version)" v$version
+        hub release $command --message="$(get_message $version)" v$version
     fi
 done
