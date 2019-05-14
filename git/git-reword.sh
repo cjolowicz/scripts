@@ -42,6 +42,8 @@ verbose_git() {
 
 message=
 options=()
+dry_run=false
+verbose=false
 
 while [ $# -gt 0 ]
 do
@@ -65,10 +67,12 @@ do
 
         -v | --verbose)
             options+=(--verbose)
+            verbose=true
             ;;
 
         -n | --dry-run)
             options+=(--dry-run)
+            dry_run=true
             ;;
 
         -h | --help)
