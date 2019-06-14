@@ -104,7 +104,7 @@ done
 
 for file
 do
-    ext=${name##*.}
+    ext="${file##*.}"
 
     name="$(basename "$file")"
     name="${name%.$ext}"
@@ -114,19 +114,29 @@ do
 
     if $dry_run
     then
-        rename=(rename --subst-all "$placeholder" "$name" --dry-run)
-        copy=(printf 'cp %q %q\n' "$name.$ext")
+        find "$skeleton" -mindepth 1 -depth -name "*${placeholder}*" -printf \
+             "cd '%h' && rename --subst-all '$placeholder' '$name' '%f'\n" |
+            sed "s;^cd $skeleton;cd $name;"
+
+        find "$skeleton" -mindepth 1 -type f -name "$placeholder.$ext" -exec \
+             printf 'cp %q %q\n' "$name.$ext" {} +
+
+        if find "$skeleton" -type f -name "$placeholder.$ext" -exec false {} +
+        then
+            run cp "$name.$ext" "$name"
+        fi
     else
-        rename=(rename --subst-all "$placeholder" "$name")
-        copy=(cp "$name.$ext")
-    fi
+        find "$name" -depth -name "*${placeholder}*" -execdir \
+             rename --subst-all "$placeholder" "$name" {} +
 
-    find "$name" -depth -name "*${placeholder}*" -execdir "${rename[@]}" {} +
-    find "$name" -type f -name "$name.$ext" -execdir "${copy[@]}" {} +
+        find "$name" -type f -name "$name.$ext" -exec \
+             cp "$name.$ext" {} +
 
-    if ! find "$name" -type f -name "$name.$ext" -exec false {} +
-    then
-        run cp "$name.$ext" "$name"
+        if find "$name" -type f -name "$name.$ext" -exec false {} +
+        then
+            run cp "$name.$ext" "$name"
+        fi
+
     fi
 
     run rm "$name.$ext"
