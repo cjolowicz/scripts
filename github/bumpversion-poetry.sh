@@ -10,10 +10,21 @@ usage() {
     echo "usage: $program [options] <version>
 Bump version using Poetry.
 
-This is a front-end to \`poetry version\`. It uses Poetry to bump the version,
-then modifies \`__version__\` in the installed package.
+This is a front-end to \`poetry version\`. By default, it performs the
+following actions:
+
+    1. Bump the version using Poetry.
+    2. Modify \`__version__\` in the package.
+    3. Commit the changes.
+    4. Add a version tag.
 
 options:
+    --commit     Commit the changes to Git (default).
+    --tag        Add a version tag (default).
+    --push       Push the changes to origin.
+    --no-commit  Do not commit the changes to Git.
+    --no-tag     Do not add a version tag.
+    --no-push    Do not push the changes to origin (default).
     -h, --help   Display this message.
 "
 }
@@ -40,12 +51,40 @@ verbose_run() {
 
 ### command line #######################################################
 
+commit=true
+tag=true
+push=false
+
 while [ $# -gt 0 ]
 do
     option="$1"
     shift
 
     case $option in
+        --commit)
+            commit=true
+            ;;
+
+        --no-commit)
+            commit=false
+            ;;
+
+        --tag)
+            tag=true
+            ;;
+
+        --no-tag)
+            tag=false
+            ;;
+
+        --push)
+            push=true
+            ;;
+
+        --no-push)
+            push=false
+            ;;
+
         -h | --help)
             usage
             exit
@@ -92,3 +131,20 @@ new_version=$(get_version)
 sed_program='s/^\( *__version__ *= *\)"'"$old_version"'"/\1"'"$new_version"'"/'
 
 find . -name '*.py' -print0 | xargs -0 sed -i "$sed_program"
+
+message="Bump version: $old_version → $new_version"
+
+if $commit
+then
+    git commit --all --message="$message"
+fi
+
+if $tag
+then
+    git tag --message="$message" "v$new_version"
+fi
+
+if $push
+then
+    git push --follow-tags
+fi
