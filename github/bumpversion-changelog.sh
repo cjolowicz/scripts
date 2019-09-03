@@ -132,7 +132,7 @@ if $dry_run; then
 fi
 
 IFS=
-while read line
+while read -r line
 do
     case $line in
         '## [Unreleased]')
