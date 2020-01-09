@@ -2,6 +2,7 @@
 
 for host
 do
-    openssl s_client -showcerts -connect $host:443 </dev/null 2>/dev/null |
+    echo quit |
+    openssl s_client -showcerts -servername $host -connect $host:443 |
 	openssl x509 -outform PEM
 done
