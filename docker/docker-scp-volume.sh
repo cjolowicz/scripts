@@ -11,10 +11,13 @@ shift
 host2=$1
 shift
 
+image=alpine
+
 options=(
     --rm
     --volume=$volume:/volume
+    --workdir=/volume
 )
 
-ssh $host1 docker run "${options[@]}" alpine tar c -C /volume -f - . |
-    ssh $host2 docker run "${options[@]}" --interactive alpine tar x -C /volume -f - -p -v
+ssh $host1 docker run "${options[@]}" $image tar c -f - . |
+    ssh $host2 docker run "${options[@]}" --interactive $image tar x -f - -p -v
