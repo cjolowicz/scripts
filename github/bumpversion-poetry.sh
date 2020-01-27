@@ -119,7 +119,7 @@ shift
 ### main ###############################################################
 
 get_version() {
-    sed -n 's/^ *version *= *"\([^"]*\)"/\1/p' pyproject.toml
+    poetry version --no-ansi | cut -d' ' -f2
 }
 
 old_version=$(get_version)
