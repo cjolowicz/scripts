@@ -118,21 +118,17 @@ shift
 
 ### main ###############################################################
 
-get_version() {
-    poetry version --no-ansi | cut -d' ' -f2
-}
-
-old_version=$(get_version)
+read name old_version <<< "$(poetry version)"
 
 poetry version "$version"
 
-new_version=$(get_version)
+read name new_version <<< "$(poetry version)"
 
 sed_program='s/^\( *__version__ *= *\)"'"$old_version"'"/\1"'"$new_version"'"/'
 
 find . -name '*.py' -print0 | xargs -0 sed -i "$sed_program"
 
-message="Bump version: $old_version → $new_version"
+message="$name $new_version"
 
 if $commit
 then
