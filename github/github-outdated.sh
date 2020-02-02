@@ -9,11 +9,15 @@ baseurl=https://api.github.com
 
 check_rate_limit() {
     remaining=$(curl -fSsL $baseurl/rate_limit | jq -r .resources.core.remaining)
-    reset=$(curl -fSsL $baseurl/rate_limit | jq -r .resources.core.reset)
-    reset="$(date --date=@$reset +%H:%M:%S)"
 
-    echo "Hit rate limit, retry at $reset" >&2
-    exit 1
+    if [ "$remaining" -eq 0 ]
+    then
+        reset=$(curl -fSsL $baseurl/rate_limit | jq -r .resources.core.reset)
+        reset="$(date --date=@$reset +%H:%M:%S)"
+
+        echo "Hit rate limit, retry at $reset" >&2
+        exit 1
+    fi
 }
 
 awk -F: '{ print $1 " " $2 }' "$@" |
