@@ -1,9 +1,14 @@
 #!/bin/bash
 # usage: github-outdated [FILES]
 #
-# Input lines have format `USER/REPO: VERSION`. Output lines have the format
-# `USER/REPO: CURRENT → LATEST`. An output line is printed if the current
-# version is not a prefix of the latest version.
+# - Input lines have the format `USER/REPO: VERSION`.
+#
+# - Output lines have the formats:
+#
+#   * `USER/REPO: CURRENT` if the current version is equal to the latest version
+#   * `USER/REPO: CURRENT (LATEST)` if the current version is a prefix of the
+#     latest version
+#   * `USER/REPO: CURRENT → LATEST` otherwise
 
 baseurl=https://api.github.com
 
@@ -30,5 +35,10 @@ awk -F: '{ print $1 " " $2 }' "$@" |
         if [ "$latest" == "${latest#$version}" ]
         then
             echo "$repository: $version → $latest"
+        elif [ "$latest" != "$version" ]
+        then
+            echo "$repository: $version ($latest)"
+        else
+            echo "$repository: $version"
         fi
     done
