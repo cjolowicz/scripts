@@ -5,7 +5,7 @@ set -euo pipefail
 program=$(basename $0)
 usage="\
 usage: $program --init [URL]
-       $program fetch
+       $program
 
 Dependencies:
 
