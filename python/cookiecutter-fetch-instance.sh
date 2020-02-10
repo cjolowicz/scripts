@@ -73,7 +73,7 @@ fetch() {
     git filter-repo "${filter_options[@]}"
 }
 
-while [ $# - gt 0 ]
+while [ $# -gt 0 ]
 do
     option="$1"
     shift
