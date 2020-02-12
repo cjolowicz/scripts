@@ -14,14 +14,16 @@ This is a front-end to \`poetry version\`. By default, it performs the
 following actions:
 
     1. Bump the version using Poetry.
-    2. Modify \`__version__\` in the package.
+    2. Modify \`__version__\` in the package (optional).
     3. Commit the changes.
     4. Add a version tag.
 
 options:
+    --dunder     Modify \`__version__\` in the package.
     --commit     Commit the changes to Git (default).
     --tag        Add a version tag (default).
     --push       Push the changes to origin.
+    --no-dunder  Do not modify \`__version__\` (default).
     --no-commit  Do not commit the changes to Git.
     --no-tag     Do not add a version tag.
     --no-push    Do not push the changes to origin (default).
@@ -51,6 +53,7 @@ verbose_run() {
 
 ### command line #######################################################
 
+dunder=false
 commit=true
 tag=true
 push=false
@@ -61,6 +64,14 @@ do
     shift
 
     case $option in
+        --dunder)
+            dunder=true
+            ;;
+
+        --no-dunder)
+            dunder=false
+            ;;
+
         --commit)
             commit=true
             ;;
@@ -124,9 +135,12 @@ poetry version "$version"
 
 read name new_version <<< "$(poetry version)"
 
-sed_program='s/^\( *__version__ *= *\)"'"$old_version"'"/\1"'"$new_version"'"/'
+if $dunder
+then
+    sed_program='s/^\( *__version__ *= *\)"'"$old_version"'"/\1"'"$new_version"'"/'
 
-find . -name '*.py' -print0 | xargs -0 sed -i "$sed_program"
+    find . -name '*.py' -print0 | xargs -0 sed -i "$sed_program"
+fi
 
 message="$name $new_version"
 
