@@ -81,6 +81,9 @@ poetry show --outdated --no-ansi |
     awk '{ print $1, $3 }' |
     while read package version
 do
+    echo "==> $package $version <=="
+    echo
+
     branch=upgrade/$package-$version
 
     git switch --create $branch master
@@ -92,6 +95,8 @@ do
     then
         git push --set-upstream origin $branch
     fi
+
+    echo
 done
 
 git switch $branch
