@@ -24,8 +24,10 @@ If no packages are specified on the command-line, all outdated dependencies are
 upgraded.
 
 options:
+    --install            Install dependency into virtual environment (default).
     --commit             Commit the changes to Git (default).
     --push               Push the changes to remote.
+    --no-install         Do not install dependency into virtual environment.
     --no-commit          Do not commit the changes to Git.
     --no-push            Do not push the changes (default).
     -r, --remote=REMOTE  Specify the remote to push to (default: origin).
@@ -54,6 +56,7 @@ missing_arg() {
 
 ### command line #######################################################
 
+install=true
 commit=true
 push=false
 remote=origin
@@ -64,6 +67,14 @@ do
     shift
 
     case $option in
+        --install)
+            install=true
+            ;;
+
+        --no-install)
+            install=false
+            ;;
+
         --commit)
             commit=true
             ;;
@@ -171,7 +182,12 @@ do
         fi
     fi
 
-    poetry update "$package"
+    if $install
+    then
+        poetry update "$package"
+    else
+        poetry update --lock "$package"
+    fi
 
     if git diff --quiet --exit-code pyproject.toml poetry.lock
     then
