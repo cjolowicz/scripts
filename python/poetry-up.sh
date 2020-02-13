@@ -159,12 +159,14 @@ do
 
     branch="upgrade/$package-$version"
 
-    if $commit
+    if $commit || $push
     then
-        git switch --create "$branch" master
-    elif $push
-    then
-        git switch "$branch"
+        if git show-ref --verify --quiet refs/heads/"$branch"
+        then
+            git switch "$branch"
+        else
+            git switch --create "$branch" master
+        fi
     fi
 
     poetry update "$package"
