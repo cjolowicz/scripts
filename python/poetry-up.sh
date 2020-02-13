@@ -10,6 +10,16 @@ usage() {
     echo "usage: $program [options]
 Upgrade dependencies using Poetry.
 
+This is a front-end to \`poetry update\`.
+
+By default, the script determines outdated dependencies using \`poetry show
+--outdated\`, and performs the following actions for every reported package:
+
+    1. Switch to a new branch \`upgrade/<package>-<version>\`.
+    2. Update the dependency.
+    3. Commit the changes to pyproject.toml and poetry.lock.
+    4. Push to origin (optional).
+
 options:
     --commit     Commit the changes to Git (default).
     --push       Push the changes to origin.
