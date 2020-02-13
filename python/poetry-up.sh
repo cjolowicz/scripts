@@ -144,7 +144,7 @@ is_requested() {
     return 1
 }
 
-branch=$(git rev-parse --abbrev-ref HEAD)
+original_branch=$(git rev-parse --abbrev-ref HEAD)
 
 git diff --quiet --exit-code || error "Working tree is not clean"
 
@@ -200,5 +200,5 @@ done
 
 if $commit || $push
 then
-    git switch "$branch"
+    git switch "$original_branch"
 fi
