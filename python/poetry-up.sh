@@ -24,11 +24,12 @@ If no packages are specified on the command-line, all outdated dependencies are
 upgraded.
 
 options:
-    --commit     Commit the changes to Git (default).
-    --push       Push the changes to origin.
-    --no-commit  Do not commit the changes to Git.
-    --no-push    Do not push the changes to origin (default).
-    -h, --help   Display this message.
+    --commit             Commit the changes to Git (default).
+    --push               Push the changes to remote.
+    --no-commit          Do not commit the changes to Git.
+    --no-push            Do not push the changes (default).
+    -r, --remote=REMOTE  Specify the remote to push to (default: origin).
+    -h, --help           Display this message.
 "
 }
 
@@ -43,10 +44,15 @@ bad_usage() {
     exit 1
 }
 
+missing_arg() {
+    bad_usage "option \`$1' requires an argument"
+}
+
 ### command line #######################################################
 
 commit=true
 push=false
+remote=origin
 
 while [ $# -gt 0 ]
 do
@@ -68,6 +74,20 @@ do
 
         --no-push)
             push=false
+            ;;
+
+        -r | --remote)
+            [ $# -gt 0 ] || missing_arg "$option"
+            remote="$1"
+            shift
+            ;;
+
+        --remote=*)
+            remote="${option#${option%%=*}=}"
+            ;;
+
+        -r*)
+            remote="${option:2}"
             ;;
 
         -h | --help)
@@ -153,7 +173,7 @@ do
 
     if $push
     then
-        git push --set-upstream origin $branch
+        git push --set-upstream $remote $branch
     fi
 
     echo
