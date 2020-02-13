@@ -33,6 +33,10 @@ options:
 "
 }
 
+warn() {
+    echo "$program: $*" >&2
+}
+
 error() {
     echo "$program: $*" >&2
     exit 1
@@ -164,6 +168,21 @@ do
     fi
 
     poetry update $package
+
+    if $commit || $push
+    then
+        if git diff --quiet --exit-code pyproject.toml poetry.lock
+        then
+            warn "Skipping $package $version (Poetry refused upgrade)"
+
+            if [ "$(git rev-parse master)" = "$(git rev-parse $branch)" ]
+            then
+                git branch --delete $branch
+            fi
+
+            continue
+        fi
+    fi
 
     if $commit
     then
