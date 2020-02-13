@@ -7,7 +7,7 @@ program=$(basename $0)
 ### functions ##########################################################
 
 usage() {
-    echo "usage: $program [options]
+    echo "usage: $program [options] [<package>]..
 Upgrade dependencies using Poetry.
 
 This is a front-end to \`poetry update\`.
@@ -19,6 +19,9 @@ By default, the script determines outdated dependencies using \`poetry show
     2. Update the dependency.
     3. Commit the changes to pyproject.toml and poetry.lock.
     4. Push to origin (optional).
+
+If no packages are specified on the command-line, all outdated dependencies are
+upgraded.
 
 options:
     --commit     Commit the changes to Git (default).
@@ -91,9 +94,31 @@ do
     esac
 done
 
-[ $# -eq 0 ] || bad_usage "unrecognized argument \`$1'"
+packages=("$@")
 
 ### main ###############################################################
+
+# Return with success if the package was specified on the command-line, or if no
+# packages were specified on the command-line.
+is_requested() {
+    local needle="$1"
+    local element=
+
+    if [ ${#packages[@]} -eq 0 ]
+    then
+        return 0
+    fi
+
+    for element in "${packages[@]}"
+    do
+        if [ "$element" == "$needle" ]
+        then
+            return 0
+        fi
+    done
+
+    return 1
+}
 
 branch=$(git rev-parse --abbrev-ref HEAD)
 
@@ -103,6 +128,8 @@ poetry show --outdated --no-ansi |
     awk '{ print $1, $3 }' |
     while read package version
 do
+    is_requested "$package" || continue
+
     echo "==> $package $version <=="
     echo
 
