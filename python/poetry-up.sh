@@ -14,6 +14,7 @@ options:
     --commit     Commit the changes to Git (default).
     --push       Push the changes to origin.
     --no-commit  Do not commit the changes to Git.
+    --no-push    Do not push the changes to origin (default).
     -h, --help   Display this message.
 "
 }
