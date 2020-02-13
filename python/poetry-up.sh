@@ -11,7 +11,9 @@ usage() {
 Upgrade dependencies using Poetry.
 
 options:
+    --commit     Commit the changes to Git (default).
     --push       Push the changes to origin.
+    --no-commit  Do not commit the changes to Git.
     -h, --help   Display this message.
 "
 }
@@ -29,6 +31,7 @@ bad_usage() {
 
 ### command line #######################################################
 
+commit=true
 push=false
 
 while [ $# -gt 0 ]
@@ -37,6 +40,14 @@ do
     shift
 
     case $option in
+        --commit)
+            commit=true
+            ;;
+
+        --no-commit)
+            commit=false
+            ;;
+
         --push)
             push=true
             ;;
@@ -88,8 +99,12 @@ do
 
     git switch --create $branch master
     poetry update $package
-    git add pyproject.toml poetry.lock
-    git commit --message="Upgrade to $package $version"
+
+    if $commit
+    then
+        git add pyproject.toml poetry.lock
+        git commit --message="Upgrade to $package $version"
+    fi
 
     if $push
     then
