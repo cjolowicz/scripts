@@ -193,7 +193,7 @@ do
         continue
     fi
 
-    if $commit
+    if $package_modified && $commit
     then
         git add pyproject.toml poetry.lock
         git commit --message="Upgrade to $package $version"
