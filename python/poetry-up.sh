@@ -179,4 +179,7 @@ do
     echo
 done
 
-git switch $branch
+if $commit || $push
+then
+    git switch $branch
+fi
