@@ -157,17 +157,17 @@ do
     echo "==> $package $version <=="
     echo
 
-    branch=upgrade/$package-$version
+    branch="upgrade/$package-$version"
 
     if $commit
     then
-        git switch --create $branch master
+        git switch --create "$branch" master
     elif $push
     then
-        git switch $branch
+        git switch "$branch"
     fi
 
-    poetry update $package
+    poetry update "$package"
 
     if $commit || $push
     then
@@ -177,7 +177,7 @@ do
 
             if [ "$(git rev-parse master)" = "$(git rev-parse $branch)" ]
             then
-                git branch --delete $branch
+                git branch --delete "$branch"
             fi
 
             continue
@@ -192,7 +192,7 @@ do
 
     if $push
     then
-        git push --set-upstream $remote $branch
+        git push --set-upstream "$remote" "$branch"
     fi
 
     echo
@@ -200,5 +200,5 @@ done
 
 if $commit || $push
 then
-    git switch $branch
+    git switch "$branch"
 fi
