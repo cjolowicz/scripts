@@ -98,7 +98,14 @@ do
 
     branch=upgrade/$package-$version
 
-    git switch --create $branch master
+    if $commit
+    then
+        git switch --create $branch master
+    elif $push
+    then
+        git switch $branch
+    fi
+
     poetry update $package
 
     if $commit
