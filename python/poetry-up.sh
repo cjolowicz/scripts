@@ -177,6 +177,7 @@ do
 
             if [ "$(git rev-parse master)" = "$(git rev-parse $branch)" ]
             then
+                git switch "$original_branch"
                 git branch --delete "$branch"
             fi
 
