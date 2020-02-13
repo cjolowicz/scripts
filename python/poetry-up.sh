@@ -173,20 +173,24 @@ do
 
     poetry update "$package"
 
-    if ($commit || $push) && ! $upgrade_branch_existed
+    if git diff --quiet --exit-code pyproject.toml poetry.lock
     then
-        if git diff --quiet --exit-code pyproject.toml poetry.lock
+        package_modified=false
+    else
+        package_modified=true
+    fi
+
+    if ! $package_modified && ! $upgrade_branch_existed && ($commit || $push)
+    then
+        warn "Skipping $package $version (Poetry refused upgrade)"
+
+        if [ "$(git rev-parse master)" = "$(git rev-parse $branch)" ]
         then
-            warn "Skipping $package $version (Poetry refused upgrade)"
-
-            if [ "$(git rev-parse master)" = "$(git rev-parse $branch)" ]
-            then
-                git switch "$original_branch"
-                git branch --delete "$branch"
-            fi
-
-            continue
+            git switch "$original_branch"
+            git branch --delete "$branch"
         fi
+
+        continue
     fi
 
     if $commit
