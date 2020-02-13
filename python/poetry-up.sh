@@ -75,7 +75,7 @@ done
 
 branch=$(git rev-parse --abbrev-ref HEAD)
 
-[ -z "$(git status --porcelain)" ] || error "Working tree is not clean"
+git diff --quiet --exit-code || error "Working tree is not clean"
 
 poetry show --outdated --no-ansi |
     awk '{ print $1, $3 }' |
