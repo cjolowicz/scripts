@@ -158,11 +158,13 @@ do
     echo
 
     branch="upgrade/$package-$version"
+    upgrade_branch_existed=false
 
     if $commit || $push
     then
         if git show-ref --verify --quiet refs/heads/"$branch"
         then
+            upgrade_branch_existed=true
             git switch "$branch"
         else
             git switch --create "$branch" master
@@ -171,7 +173,7 @@ do
 
     poetry update "$package"
 
-    if $commit || $push
+    if ($commit || $push) && ! $upgrade_branch_existed
     then
         if git diff --quiet --exit-code pyproject.toml poetry.lock
         then
