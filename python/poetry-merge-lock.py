@@ -154,8 +154,8 @@ class MergeConflictError(ValueError):
     """
 
     def __init__(self, ours: Any, theirs: Any, keys: List[tomlkit.api.Key]):
-        message = "Merge conflict at {}, merging {} and {}".format(
-            ".".join(str(key) for key in keys), repr(ours), repr(theirs)
+        message = "Merge conflict at {}, merging {!r} and {!r}".format(
+            ".".join(str(key) for key in keys), ours, theirs
         )
         super().__init__(message)
 
