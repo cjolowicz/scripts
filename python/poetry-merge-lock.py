@@ -161,15 +161,6 @@ class MergeConflictError(ValueError):
         super().__init__(message)
 
 
-def merge_item(ours: Any, theirs: Any, keys: List[tomlkit.api.Key]) -> Any:
-    try:
-        return _merge_item(ours, theirs, keys)
-    except MergeConflictError:
-        raise
-    except ValueError as error:
-        raise MergeConflictError(ours, theirs, keys) from error
-
-
 def _merge_item(ours: Any, theirs: Any, keys: List[tomlkit.api.Key]) -> Any:
     """
     Merge items in TOML documents.
@@ -215,6 +206,15 @@ def _merge_item(ours: Any, theirs: Any, keys: List[tomlkit.api.Key]) -> Any:
         raise MergeConflictError(ours, theirs, keys)
 
     return ours
+
+
+def merge_item(ours: Any, theirs: Any, keys: List[tomlkit.api.Key]) -> Any:
+    try:
+        return _merge_item(ours, theirs, keys)
+    except MergeConflictError:
+        raise
+    except ValueError as error:
+        raise MergeConflictError(ours, theirs, keys) from error
 
 
 def merge_documents(ours: TOMLDocument, theirs: TOMLDocument) -> TOMLDocument:
