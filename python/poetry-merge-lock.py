@@ -137,6 +137,7 @@ def load_file(toml_file: Path) -> Tuple[TOMLDocument, TOMLDocument]:
         A pair of TOML documents, corresponding to *our* version and *their*
         version.
     """
+
     def load(lines: Sequence[Optional[str]]) -> TOMLDocument:
         data = "".join(line for line in lines if line is not None)
         return tomlkit.loads(data)
@@ -154,9 +155,7 @@ class MergeConflictError(ValueError):
 
     def __init__(self, ours: Any, theirs: Any, keys: List[tomlkit.api.Key]):
         message = "Merge conflict at {}, merging {} and {}".format(
-            ".".join(str(key) for key in keys),
-            repr(ours),
-            repr(theirs),
+            ".".join(str(key) for key in keys), repr(ours), repr(theirs)
         )
         super().__init__(message)
 
