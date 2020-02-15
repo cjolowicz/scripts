@@ -299,7 +299,7 @@ def write_lock_file(
         local_config: The ``tool.poetry`` section of the pyproject file.
     """
     with tempfile.NamedTemporaryFile(delete=False) as temporary:
-        data = document.as_string()
+        data = document.as_string().encode()
         temporary.write(data)
 
     try:
