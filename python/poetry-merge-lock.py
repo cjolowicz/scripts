@@ -8,7 +8,7 @@ from hashlib import sha256
 import json
 import os
 import tempfile
-from typing import Any, Iterator, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
 
 from poetry.factory import Factory
 from poetry.packages.locker import Locker
@@ -160,6 +160,34 @@ class MergeConflictError(ValueError):
         super().__init__(message)
 
 
+def merge_array(
+    ours: List[Any], theirs: List[Any], keys: List[tomlkit.api.Key]
+) -> List[Any]:
+    """
+    Merge TOML arrays.
+    """
+    for value in theirs:
+        if value not in ours:
+            ours.append(value)
+
+    return ours
+
+
+def merge_table(
+    ours: Dict[Any, Any], theirs: Dict[Any, Any], keys: List[tomlkit.api.Key]
+) -> Dict[Any, Any]:
+    """
+    Merge TOML tables.
+    """
+    for key, value in theirs.items():
+        if key in ours:
+            ours[key] = merge_item(ours[key], value, keys + [key])
+        else:
+            ours[key] = value
+
+    return ours
+
+
 def _merge_item(ours: Any, theirs: Any, keys: List[tomlkit.api.Key]) -> Any:
     """
     Merge items in TOML documents.
@@ -183,23 +211,13 @@ def _merge_item(ours: Any, theirs: Any, keys: List[tomlkit.api.Key]) -> Any:
         if not isinstance(theirs, list):
             raise MergeConflictError(ours, theirs, keys)
 
-        for value in theirs:
-            if value not in ours:
-                ours.append(value)
-
-        return ours
+        return merge_array(ours, theirs, keys)
 
     if isinstance(ours, dict):
         if not isinstance(theirs, dict):
             raise MergeConflictError(ours, theirs, keys)
 
-        for key, value in theirs.items():
-            if key in ours:
-                ours[key] = merge_item(ours[key], value, keys + [key])
-            else:
-                ours[key] = value
-
-        return ours
+        return merge_table(ours, theirs, keys)
 
     if ours != theirs:
         raise MergeConflictError(ours, theirs, keys)
