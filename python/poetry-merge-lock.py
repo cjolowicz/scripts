@@ -152,16 +152,29 @@ class MergeConflictError(ValueError):
     An item in the TOML document cannot be merged.
     """
 
-    def __init__(self, keys: List[tomlkit.api.Key]):
-        message = "Merge conflict at {}".format(".".join(key.key for key in keys))
+    def __init__(self, ours: Any, theirs: Any, keys: List[tomlkit.api.Key]):
+        message = "Merge conflict at {}, merging {} and {}".format(
+            ".".join(str(key) for key in keys),
+            repr(ours),
+            repr(theirs),
+        )
         super().__init__(message)
 
 
 def merge_item(ours: Any, theirs: Any, keys: List[tomlkit.api.Key]) -> Any:
+    try:
+        return _merge_item(ours, theirs, keys)
+    except MergeConflictError:
+        raise
+    except ValueError as error:
+        raise MergeConflictError(ours, theirs, keys) from error
+
+
+def _merge_item(ours: Any, theirs: Any, keys: List[tomlkit.api.Key]) -> Any:
     """
     Merge items in TOML documents.
 
-    * Arrays are concatenated.
+    * Arrays are merged.
     * Tables are merged recursively.
     * Any other values must be equal.
 
@@ -178,16 +191,17 @@ def merge_item(ours: Any, theirs: Any, keys: List[tomlkit.api.Key]) -> Any:
     """
     if isinstance(ours, list):
         if not isinstance(theirs, list):
-            raise MergeConflictError(keys)
+            raise MergeConflictError(ours, theirs, keys)
 
         for value in theirs:
-            ours.append(value)
+            if value not in ours:
+                ours.append(value)
 
         return ours
 
     if isinstance(ours, dict):
         if not isinstance(theirs, dict):
-            raise MergeConflictError(keys)
+            raise MergeConflictError(ours, theirs, keys)
 
         for key, value in theirs.items():
             if key in ours:
@@ -198,7 +212,7 @@ def merge_item(ours: Any, theirs: Any, keys: List[tomlkit.api.Key]) -> Any:
         return ours
 
     if ours != theirs:
-        raise MergeConflictError(keys)
+        raise MergeConflictError(ours, theirs, keys)
 
     return ours
 
