@@ -282,8 +282,8 @@ def write_lock_file(
         local_config: The ``tool.poetry`` section of the pyproject file.
     """
     with tempfile.NamedTemporaryFile(delete=False) as temporary:
-        contents = document.as_string()
-        temporary.write(contents)
+        data = document.as_string()
+        temporary.write(data)
 
     try:
         validate_lock_file(temporary.name, local_config)
