@@ -217,7 +217,7 @@ def _merge_item(ours: Any, theirs: Any, keys: List[tomlkit.api.Key]) -> Any:
     return ours
 
 
-def merge(ours: TOMLDocument, theirs: TOMLDocument) -> TOMLDocument:
+def merge_documents(ours: TOMLDocument, theirs: TOMLDocument) -> TOMLDocument:
     """
     Merge TOML documents.
 
@@ -255,7 +255,7 @@ def read_lock_file(lock_file: Path, content_hash: str) -> TOMLDocument:
     for document in (ours, theirs):
         document["metadata"]["content-hash"] = content_hash
 
-    return merge(ours, theirs)
+    return merge_documents(ours, theirs)
 
 
 def validate_lock_file(lock_file: Path, local_config: dict) -> None:
