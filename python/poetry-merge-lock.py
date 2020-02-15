@@ -4,16 +4,14 @@ import os
 
 sys.path.insert(0, os.path.expanduser("~/.poetry/lib"))  # noqa
 from enum import Enum
-from hashlib import sha256
-import json
+import itertools
 import os
-import tempfile
-from typing import Any, Dict, Iterator, List, Optional, Sequence, Tuple
+from typing import Iterator, List, Optional, Sequence, Tuple
 
 from poetry.factory import Factory
+from poetry.packages import Package
 from poetry.packages.locker import Locker
 from poetry.utils._compat import Path
-from poetry.utils.toml_file import TomlFile
 import tomlkit
 import tomlkit.api
 from tomlkit.toml_document import TOMLDocument
@@ -126,7 +124,7 @@ def parse_lines(lines: Sequence[str]) -> Iterator[Tuple[Optional[str], Optional[
         raise ValueError("unterminated conflict marker")
 
 
-def load_file(toml_file: Path) -> Tuple[TOMLDocument, TOMLDocument]:
+def load_versions(toml_file: Path) -> Tuple[TOMLDocument, TOMLDocument]:
     """
     Load a pair of TOML documents from a TOML file with merge conflicts.
 
@@ -148,236 +146,34 @@ def load_file(toml_file: Path) -> Tuple[TOMLDocument, TOMLDocument]:
         return load(ours), load(theirs)
 
 
-class MergeConflictError(ValueError):
-    """
-    An item in the TOML document cannot be merged.
-    """
-
-    def __init__(self, ours: Any, theirs: Any, keys: List[tomlkit.api.Key]):
-        message = "Merge conflict at {}, merging {!r} and {!r}".format(
-            ".".join(str(key) for key in keys), ours, theirs
-        )
-        super().__init__(message)
+def load_packages(locker: Locker, lock_data: TOMLDocument) -> List[Package]:
+    locker._lock_data = lock_data
+    repository = locker.locked_repository(with_dev_reqs=True)
+    return repository.packages
 
 
-def merge_array(
-    ours: List[Any], theirs: List[Any], keys: List[tomlkit.api.Key]
-) -> List[Any]:
-    """
-    Merge TOML arrays.
-    """
-    for value in theirs:
-        if value not in ours:
-            ours.append(value)
-
-    return ours
+def merge_packages(ours: List[Package], theirs: List[Package]) -> List[Package]:
+    packages = set(itertools.chain(ours, theirs))
+    # TODO: same package, different version (e.g. upgrades on both branches)
+    return list(packages)
 
 
-def merge_table(
-    ours: Dict[Any, Any], theirs: Dict[Any, Any], keys: List[tomlkit.api.Key]
-) -> Dict[Any, Any]:
-    """
-    Merge TOML tables.
-    """
-
-    if not ours:
-        return theirs
-
-    # Create an empty table with our metadata.
-    table = ours.copy()
-    for key in ours:
-        del table[key]
-
-    their_keys = sorted(theirs)
-
-    # Preserve our order.
-    for key in ours:
-        # Insert their items with smaller keys.
-        while their_keys and their_keys[0] < key:
-            their_key = their_keys.pop(0)
-            their_value = theirs.pop(their_key)
-            table[their_key] = their_value
-
-        # Merge items with the same key.
-        if key in theirs:
-            their_keys.remove(key)
-            table[key] = merge_item(ours[key], theirs[key], keys + [key])
-        else:
-            table[key] = ours[key]
-
-    for key in their_keys:
-        table[key] = theirs[key]
-
-    return table
-
-
-def _merge_item(ours: Any, theirs: Any, keys: List[tomlkit.api.Key]) -> Any:
-    """
-    Merge items in TOML documents.
-
-    * Arrays are merged.
-    * Tables are merged recursively.
-    * Any other values must be equal.
-
-    Args:
-        ours: Our version of the item.
-        theirs: Their version of the item.
-        keys: The list of keys leading to the item.
-
-    Returns:
-        The merged item.
-
-    Raises:
-        MergeConflictError: The items cannot be merged.
-    """
-    if isinstance(ours, list):
-        if not isinstance(theirs, list):
-            raise MergeConflictError(ours, theirs, keys)
-
-        return merge_array(ours, theirs, keys)
-
-    if isinstance(ours, dict):
-        if not isinstance(theirs, dict):
-            raise MergeConflictError(ours, theirs, keys)
-
-        return merge_table(ours, theirs, keys)
-
-    if ours != theirs:
-        raise MergeConflictError(ours, theirs, keys)
-
-    return ours
-
-
-def merge_item(ours: Any, theirs: Any, keys: List[tomlkit.api.Key]) -> Any:
-    try:
-        return _merge_item(ours, theirs, keys)
-    except MergeConflictError:
-        raise
-    except ValueError as error:
-        raise MergeConflictError(ours, theirs, keys) from error
-
-
-def merge_documents(ours: TOMLDocument, theirs: TOMLDocument) -> TOMLDocument:
-    """
-    Merge TOML documents.
-
-    Args:
-        ours: Our version of the document.
-        theirs: Their version of the document.
-
-    Returns:
-        The merged TOML document.
-    """
-    document = ours.copy()
-
-    for key, value in theirs.items():
-        if key in document:
-            document[key] = merge_item(document[key], value, [key])
-        else:
-            document[key] = value
-
-    return document
-
-
-def read_lock_file(lock_file: Path, content_hash: str) -> TOMLDocument:
-    """
-    Read the lock file, resolving any merge conflicts.
-
-    Args:
-        lock_file: Path to the lock file.
-        content_hash: An SHA256 hash for the pyproject file.
-
-    Returns:
-        The merged TOML document.
-    """
-    ours, theirs = load_file(lock_file)
-
-    for document in (ours, theirs):
-        document["metadata"]["content-hash"] = content_hash
-
-    return merge_documents(ours, theirs)
-
-
-def validate_lock_file(lock_file: Path, local_config: dict) -> None:
-    """
-    Validate the lock file.
-
-    Args:
-        lock_file: Path to the lock file.
-        local_config: The ``tool.poetry`` section of the pyproject file.
-    """
-    locker = Locker(lock_file, local_config)
-    locker.locked_repository(with_dev_reqs=True)
-
-
-def write_lock_file(
-    document: TOMLDocument, lock_file: Path, local_config: dict
-) -> None:
-    """
-    Write the lock file to disk.
-
-    Args:
-        document: The contents to be written to disk.
-        lock_file: The destination path.
-        local_config: The ``tool.poetry`` section of the pyproject file.
-    """
-    with tempfile.NamedTemporaryFile(delete=False) as temporary:
-        data = document.as_string().encode()
-        temporary.write(data)
-
-    try:
-        validate_lock_file(temporary.name, local_config)
-    except:  # noqa
-        os.unlink(temporary.name)
-        raise
-    else:
-        os.replace(temporary.name, lock_file)
-
-
-def read_local_config(poetry_file: Path) -> dict:
-    """
-    Load the ``tool.poetry`` section of the pyproject file.
-    """
-    document = TomlFile(poetry_file).read()
-    return document["tool"]["poetry"]
-
-
-def get_content_hash(config: dict) -> str:
-    """
-    Return the SHA256 hash of the sorted ``tool.poetry`` section.
-    """
-    contents = {
-        key: config.get(key)
-        for key in ["dependencies", "dev-dependencies", "source", "extras"]
-    }
-
-    data = json.dumps(contents, sort_keys=True).encode()
-
-    return sha256(data).hexdigest()
-
-
-def merge_lock_file(poetry_file: Path, lock_file: Path) -> None:
-    """
-    Resolve merge conflicts in the lock file.
-
-    Args:
-        poetry_file: Path to the pyproject file.
-        lock_file: Path to the lock file.
-    """
-    config = read_local_config(poetry_file)
-    content_hash = get_content_hash(config)
-    document = read_lock_file(lock_file, content_hash)
-    write_lock_file(document, lock_file, config)
+def merge_locked_packages(locker: Locker) -> List[Package]:
+    lock_file = Path(locker.lock._path)
+    ours, theirs = [
+        load_packages(locker, lock_data)
+        for lock_data in load_versions(lock_file)
+    ]
+    return merge_packages(ours, theirs)
 
 
 def main() -> None:
     """
     Resolve merge conflicts in poetry.lock.
     """
-    poetry_file = Factory.locate(Path.cwd())
-    lock_file = poetry_file.parent / "poetry.lock"
-
-    merge_lock_file(poetry_file, lock_file)
+    poetry = Factory().create_poetry(Path.cwd())
+    packages = merge_locked_packages(poetry.locker)
+    poetry.locker.set_lock_data(poetry.package, packages)
 
 
 if __name__ == "__main__":
