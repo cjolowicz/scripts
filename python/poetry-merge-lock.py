@@ -179,13 +179,36 @@ def merge_table(
     """
     Merge TOML tables.
     """
-    for key, value in theirs.items():
-        if key in ours:
-            ours[key] = merge_item(ours[key], value, keys + [key])
-        else:
-            ours[key] = value
 
-    return ours
+    if not ours:
+        return theirs
+
+    # Create an empty table with our metadata.
+    table = ours.copy()
+    for key in ours:
+        del table[key]
+
+    their_keys = sorted(theirs)
+
+    # Preserve our order.
+    for key in ours:
+        # Insert their items with smaller keys.
+        while their_keys and their_keys[0] < key:
+            their_key = their_keys.pop(0)
+            their_value = theirs.pop(their_key)
+            table[their_key] = their_value
+
+        # Merge items with the same key.
+        if key in theirs:
+            their_keys.remove(key)
+            table[key] = merge_item(ours[key], theirs[key], keys + [key])
+        else:
+            table[key] = ours[key]
+
+    for key in their_keys:
+        table[key] = theirs[key]
+
+    return table
 
 
 def _merge_item(ours: Any, theirs: Any, keys: List[tomlkit.api.Key]) -> Any:
