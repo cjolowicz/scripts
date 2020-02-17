@@ -158,9 +158,6 @@ class MergeConflictError(ValueError):
         super().__init__(message)
 
 
-AnyDict = Dict[str, Any]
-
-
 def merge_packages(value: List[Table], other: List[Table]) -> List[Table]:
     packages: Dict[str, Table] = {}
 
@@ -172,7 +169,7 @@ def merge_packages(value: List[Table], other: List[Table]) -> List[Table]:
     return list(packages.values())
 
 
-def merge_files(value: AnyDict, other: AnyDict) -> AnyDict:
+def merge_files(value: Table, other: Table) -> Table:
     files = tomlkit.table()
 
     for key in set(itertools.chain(value, other)):
