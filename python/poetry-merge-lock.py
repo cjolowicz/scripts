@@ -13,7 +13,7 @@ from poetry.packages import Package
 from poetry.packages.locker import Locker
 from poetry.utils._compat import Path
 import tomlkit
-import tomlkit.api
+from tomlkit.api import Key
 from tomlkit.toml_document import TOMLDocument
 
 
@@ -151,7 +151,7 @@ class MergeConflictError(ValueError):
     An item in the TOML document cannot be merged.
     """
 
-    def __init__(self, keys: List[tomlkit.api.Key], ours: Any, theirs: Any):
+    def __init__(self, keys: List[Key], ours: Any, theirs: Any):
         message = "Merge conflict at {}, merging {!r} and {!r}".format(
             ".".join(str(key) for key in keys), ours, theirs
         )
