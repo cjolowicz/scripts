@@ -163,6 +163,7 @@ AnyDict = Dict[str, Any]
 
 def merge_packages(value: List[AnyDict], other: List[AnyDict]) -> List[AnyDict]:
     packages = {}
+
     for package in itertools.chain(value, other):
         current = packages.setdefault(package["name"], package)
         if package.value != current.value:
@@ -173,12 +174,14 @@ def merge_packages(value: List[AnyDict], other: List[AnyDict]) -> List[AnyDict]:
 
 def merge_files(value: AnyDict, other: AnyDict) -> AnyDict:
     files = tomlkit.table()
+
     for key in set(itertools.chain(value, other)):
         a = value.get(key)
         b = other.get(key)
         if None not in (a, b) and a != b:
             raise MergeConflictError(["metadata", "files", key], a, b)
         files[key] = a if a is not None else b
+
     return files
 
 
@@ -188,6 +191,7 @@ def merge_versions(value: TOMLDocument, other: TOMLDocument) -> TOMLDocument:
     document["metadata"] = {
         "files": merge_files(value["metadata"]["files"], other["metadata"]["files"]),
     }
+
     return document
 
 
