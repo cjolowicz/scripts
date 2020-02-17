@@ -3,7 +3,6 @@ import sys
 import os
 
 sys.path.insert(0, os.path.expanduser("~/.poetry/lib"))  # noqa
-from collections import defaultdict
 from enum import Enum
 import itertools
 import os
