@@ -159,6 +159,19 @@ class MergeConflictError(ValueError):
 
 
 def merge_locked_packages(value: List[Table], other: List[Table]) -> List[Table]:
+    """
+    Merge two TOML arrays containing locked packages.
+
+    Args:
+        value: The packages in *our* version of the lock file.
+        other: The packages in *their* version of the lock file.
+
+    Returns:
+        The packages obtained from merging both versions.
+
+    Raises:
+        MergeConflictError: The lists contain different values for the same package.
+    """
     packages: Dict[str, Table] = {}
 
     for package in itertools.chain(value, other):
@@ -170,6 +183,19 @@ def merge_locked_packages(value: List[Table], other: List[Table]) -> List[Table]
 
 
 def merge_locked_package_files(value: Table, other: Table) -> Table:
+    """
+    Merge two TOML tables containing package files.
+
+    Args:
+        value: The package files in *our* version of the lock file.
+        other: The package files in *their* version of the lock file.
+
+    Returns:
+        The package files obtained from merging both versions.
+
+    Raises:
+        MergeConflictError: The tables contain different files for the same package.
+    """
     files = tomlkit.table()
 
     for key in set(itertools.chain(value, other)):
@@ -183,6 +209,24 @@ def merge_locked_package_files(value: Table, other: Table) -> Table:
 
 
 def merge_lock_data(value: TOMLDocument, other: TOMLDocument) -> TOMLDocument:
+    """
+    Merge two versions of lock data.
+
+    This function returns a TOML document with the following merged entries:
+
+    * ``package``
+    * ``metadata.files``
+
+    Any other entries, e.g. ``metadata.content-hash``, are omitted. They are
+    generated from pyproject.toml when the lock data is written to disk.
+
+    Args:
+        value: Our version of the lock data.
+        other: Their version of the lock data.
+
+    Returns:
+        The merged lock data.
+    """
     document = tomlkit.document()
     document["package"] = merge_locked_packages(value["package"], other["package"])
     document["metadata"] = {
@@ -195,6 +239,20 @@ def merge_lock_data(value: TOMLDocument, other: TOMLDocument) -> TOMLDocument:
 
 
 def activate_dependencies(packages: List[Package]) -> None:
+    """
+    Activate the optional dependencies of every package.
+
+    Activating optional dependencies ensures their inclusion when the lock file
+    is written.  Normally, optional dependencies are activated by the solver if
+    another package depends on them.  But invoking the solver would result in
+    regenerating the lock file from scratch, losing the information in the
+    original lock file.  So we activate the dependencies manually instead.  We
+    know the solver would activate them because they would not be present in the
+    lock file otherwise.
+
+    Args:
+        packages: The list of packages.
+    """
     for package in packages:
         for dependency in package.requires:
             if dependency.is_optional():
@@ -202,6 +260,16 @@ def activate_dependencies(packages: List[Package]) -> None:
 
 
 def load_packages(locker: Locker, lock_data: TOMLDocument) -> List[Package]:
+    """
+    Load the packages from a TOML document with lock data.
+
+    Args:
+        locker: The locker object.
+        lock_data: The lock data.
+
+    Returns:
+        The list of packages.
+    """
     locker._lock_data = lock_data
     repository = locker.locked_repository(with_dev_reqs=True)
     activate_dependencies(repository.packages)
@@ -217,7 +285,7 @@ def merge_packages(locker: Locker) -> List[Package]:
 
 def main() -> None:
     """
-    Resolve merge conflicts in poetry.lock.
+    Resolve merge conflicts in Poetry's lock file.
     """
     poetry = Factory().create_poetry(Path.cwd())
     packages = merge_packages(poetry.locker)
