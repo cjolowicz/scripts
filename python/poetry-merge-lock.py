@@ -159,10 +159,9 @@ class MergeConflictError(ValueError):
 
 
 AnyDict = Dict[str, Any]
-AnyDictList = List[AnyDict]
 
 
-def merge_packages(value: AnyDictList, other: AnyDictList) -> AnyDictList:
+def merge_packages(value: List[AnyDict], other: List[AnyDict]) -> List[AnyDict]:
     packages = {}
     for package in itertools.chain(value, other):
         current = packages.setdefault(package["name"], package)
