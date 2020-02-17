@@ -13,7 +13,7 @@ from poetry.packages import Package
 from poetry.packages.locker import Locker
 from poetry.utils._compat import Path
 import tomlkit
-from tomlkit.api import Key
+from tomlkit.api import Key, Table
 from tomlkit.toml_document import TOMLDocument
 
 
@@ -161,8 +161,8 @@ class MergeConflictError(ValueError):
 AnyDict = Dict[str, Any]
 
 
-def merge_packages(value: List[AnyDict], other: List[AnyDict]) -> List[AnyDict]:
-    packages = {}
+def merge_packages(value: List[Table], other: List[Table]) -> List[Table]:
+    packages: Dict[str, Table] = {}
 
     for package in itertools.chain(value, other):
         current = packages.setdefault(package["name"], package)
