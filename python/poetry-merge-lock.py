@@ -162,32 +162,32 @@ AnyDict = Dict[str, Any]
 AnyDictList = List[AnyDict]
 
 
-def merge_packages(ours: AnyDictList, theirs: AnyDictList) -> AnyDictList:
+def merge_packages(value: AnyDictList, other: AnyDictList) -> AnyDictList:
     packages = {}
-    for package in itertools.chain(ours, theirs):
-        value = packages.setdefault(package["name"], package)
-        if package.value != value.value:
-            raise MergeConflictError(["package"], value, package)
+    for package in itertools.chain(value, other):
+        current = packages.setdefault(package["name"], package)
+        if package.value != current.value:
+            raise MergeConflictError(["package"], current, package)
 
     return list(packages.values())
 
 
-def merge_files(ours: AnyDict, theirs: AnyDict) -> AnyDict:
+def merge_files(value: AnyDict, other: AnyDict) -> AnyDict:
     files = tomlkit.table()
-    for key in set(itertools.chain(ours, theirs)):
-        our_value = ours.get(key)
-        their_value = theirs.get(key)
-        if None not in (our_value, their_value) and our_value != their_value:
-            raise MergeConflictError(["metadata", "files", key], our_value, their_value)
-        files[key] = our_value if our_value is not None else their_value
+    for key in set(itertools.chain(value, other)):
+        a = value.get(key)
+        b = other.get(key)
+        if None not in (a, b) and a != b:
+            raise MergeConflictError(["metadata", "files", key], a, b)
+        files[key] = a if a is not None else b
     return files
 
 
-def merge_versions(ours: TOMLDocument, theirs: TOMLDocument) -> TOMLDocument:
+def merge_versions(value: TOMLDocument, other: TOMLDocument) -> TOMLDocument:
     document = tomlkit.document()
-    document["package"] = merge_packages(ours["package"], theirs["package"])
+    document["package"] = merge_packages(value["package"], other["package"])
     document["metadata"] = {
-        "files": merge_files(ours["metadata"]["files"], theirs["metadata"]["files"]),
+        "files": merge_files(value["metadata"]["files"], other["metadata"]["files"]),
     }
     return document
 
