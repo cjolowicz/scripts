@@ -238,6 +238,21 @@ def merge_lock_data(value: TOMLDocument, other: TOMLDocument) -> TOMLDocument:
     return document
 
 
+def load_lock_data(locker: Locker) -> TOMLDocument:
+    """
+    Load a lock file with merge conflicts.
+
+    Args:
+        locker: The locker object.
+
+    Returns:
+        The merged TOML document.
+    """
+    lock_file = Path(locker.lock._path)
+    ours, theirs = load_toml_versions(lock_file)
+    return merge_lock_data(ours, theirs)
+
+
 def activate_dependencies(packages: List[Package]) -> None:
     """
     Activate the optional dependencies of every package.
@@ -276,11 +291,17 @@ def load_packages(locker: Locker, lock_data: TOMLDocument) -> List[Package]:
     return repository.packages
 
 
-def merge_packages(locker: Locker) -> List[Package]:
-    lock_file = Path(locker.lock._path)
-    ours, theirs = load_toml_versions(lock_file)
-    lock_data = merge_lock_data(ours, theirs)
-    return load_packages(locker, lock_data)
+def save_lock_data(locker: Locker, lock_data: TOMLDocument, root: Package) -> None:
+    """
+    Validate and save lock data.
+
+    Args:
+        locker: The locker object.
+        lock_data: The lock data.
+        root: The root package of the Poetry project.
+    """
+    packages = load_packages(locker, lock_data)
+    locker.set_lock_data(root, packages)
 
 
 def main() -> None:
@@ -288,8 +309,8 @@ def main() -> None:
     Resolve merge conflicts in Poetry's lock file.
     """
     poetry = Factory().create_poetry(Path.cwd())
-    packages = merge_packages(poetry.locker)
-    poetry.locker.set_lock_data(poetry.package, packages)
+    lock_data = load_lock_data(poetry.locker)
+    save_lock_data(poetry.locker, lock_data, poetry.package)
 
 
 if __name__ == "__main__":
