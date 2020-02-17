@@ -124,7 +124,7 @@ def parse_lines(lines: Sequence[str]) -> Iterator[Tuple[Optional[str], Optional[
         raise ValueError("unterminated conflict marker")
 
 
-def load_versions(toml_file: Path) -> Tuple[TOMLDocument, TOMLDocument]:
+def load_toml_versions(toml_file: Path) -> Tuple[TOMLDocument, TOMLDocument]:
     """
     Load a pair of TOML documents from a TOML file with merge conflicts.
 
@@ -158,7 +158,7 @@ class MergeConflictError(ValueError):
         super().__init__(message)
 
 
-def merge_packages(value: List[Table], other: List[Table]) -> List[Table]:
+def merge_locked_packages(value: List[Table], other: List[Table]) -> List[Table]:
     packages: Dict[str, Table] = {}
 
     for package in itertools.chain(value, other):
@@ -169,7 +169,7 @@ def merge_packages(value: List[Table], other: List[Table]) -> List[Table]:
     return list(packages.values())
 
 
-def merge_files(value: Table, other: Table) -> Table:
+def merge_locked_package_files(value: Table, other: Table) -> Table:
     files = tomlkit.table()
 
     for key in set(itertools.chain(value, other)):
@@ -182,11 +182,13 @@ def merge_files(value: Table, other: Table) -> Table:
     return files
 
 
-def merge_versions(value: TOMLDocument, other: TOMLDocument) -> TOMLDocument:
+def merge_lock_data(value: TOMLDocument, other: TOMLDocument) -> TOMLDocument:
     document = tomlkit.document()
-    document["package"] = merge_packages(value["package"], other["package"])
+    document["package"] = merge_locked_packages(value["package"], other["package"])
     document["metadata"] = {
-        "files": merge_files(value["metadata"]["files"], other["metadata"]["files"]),
+        "files": merge_locked_package_files(
+            value["metadata"]["files"], other["metadata"]["files"]
+        ),
     }
 
     return document
@@ -206,10 +208,10 @@ def load_packages(locker: Locker, lock_data: TOMLDocument) -> List[Package]:
     return repository.packages
 
 
-def merge_locked_packages(locker: Locker) -> List[Package]:
+def merge_packages(locker: Locker) -> List[Package]:
     lock_file = Path(locker.lock._path)
-    ours, theirs = load_versions(lock_file)
-    lock_data = merge_versions(ours, theirs)
+    ours, theirs = load_toml_versions(lock_file)
+    lock_data = merge_lock_data(ours, theirs)
     return load_packages(locker, lock_data)
 
 
@@ -218,7 +220,7 @@ def main() -> None:
     Resolve merge conflicts in poetry.lock.
     """
     poetry = Factory().create_poetry(Path.cwd())
-    packages = merge_locked_packages(poetry.locker)
+    packages = merge_packages(poetry.locker)
     poetry.locker.set_lock_data(poetry.package, packages)
 
 
