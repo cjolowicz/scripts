@@ -65,6 +65,7 @@ init() {
     fi
 
     git remote add instance $url
+    git remote set-url --push instance none
 }
 
 fetch() {
