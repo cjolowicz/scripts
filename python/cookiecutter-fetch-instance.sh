@@ -68,7 +68,7 @@ init() {
 }
 
 fetch() {
-    git fetch instance
+    git fetch --no-tags instance master
     git checkout -B instance instance/master
     git filter-repo "${filter_options[@]}"
 }
