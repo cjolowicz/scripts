@@ -19,17 +19,26 @@ By default, the script determines outdated dependencies using \`poetry show
     2. Update the dependency.
     3. Commit the changes to pyproject.toml and poetry.lock.
     4. Push to origin (optional).
+    5. Open a pull request (optional).
 
 If no packages are specified on the command-line, all outdated dependencies are
 upgraded.
+
+This script requires the following tools:
+
+    - Poetry
+    - git
+    - gh (optional, for \`--pull-request\`)
 
 options:
     --install            Install dependency into virtual environment (default).
     --commit             Commit the changes to Git (default).
     --push               Push the changes to remote.
+    --pull-request       Open a pull request.
     --no-install         Do not install dependency into virtual environment.
     --no-commit          Do not commit the changes to Git.
     --no-push            Do not push the changes (default).
+    --no-pull-request    Do not open a pull request (default).
     -r, --remote=REMOTE  Specify the remote to push to (default: origin).
     -h, --help           Display this message.
 "
@@ -59,6 +68,7 @@ missing_arg() {
 install=true
 commit=true
 push=false
+pull_request=false
 remote=origin
 
 while [ $# -gt 0 ]
@@ -89,6 +99,14 @@ do
 
         --no-push)
             push=false
+            ;;
+
+        --pull-request)
+            pull_request=true
+            ;;
+
+        --no-pull-request)
+            pull_request=false
             ;;
 
         -r | --remote)
@@ -171,7 +189,7 @@ do
     branch="upgrade/$package-$version"
     upgrade_branch_existed=false
 
-    if $commit || $push
+    if $commit || $push || $pull_request
     then
         if git show-ref --verify --quiet refs/heads/"$branch"
         then
@@ -196,7 +214,7 @@ do
         package_modified=true
     fi
 
-    if ! $package_modified && ! $upgrade_branch_existed && ($commit || $push)
+    if ! $package_modified && ! $upgrade_branch_existed && ($commit || $push || $pull_request)
     then
         warn "Skipping $package $version (Poetry refused upgrade)"
 
@@ -220,10 +238,15 @@ do
         git push --set-upstream "$remote" "$branch"
     fi
 
+    if $pull_request
+    then
+        gh pr create --title="Upgrade to $package $version" --body=""
+    fi
+
     echo
 done
 
-if $commit || $push
+if $commit || $push || $pull_request
 then
     git switch "$original_branch"
 fi
