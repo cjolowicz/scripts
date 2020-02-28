@@ -40,6 +40,13 @@ find_python() {
     local filename= python=
 
     filename="$(which "$1")" || error "$1: not on PATH"
+
+    case $filename in
+        */.pyenv/shims/*)
+            filename="$(pyenv which "$1")"
+            ;;
+    esac
+
     python=$(sed -n '1s/^#!//p' "$filename")
     $python -V >/dev/null 2>&1 || error "$1: cannot execute interpreter \"$python\""
 
