@@ -10,17 +10,18 @@ usage() {
     echo "usage: $program [options] [<package>]..
 Upgrade Python programs on PATH.
 
-This program upgrades the Python packages providing the specified commands,
-using pip. The commands must be on PATH, and have the same name as the Python
-package.
+This program upgrades the specified Python packages, using pip. Each package
+must correspond to a command on PATH having the same name as the Python package,
+unless overridden using the \`--command' option.
 
-For each package, the script searches for a command with the same name on PATH,
-and determines the Python interpreter from its shebang. The program runs pip
-with that interpreter, to ensure that the package is upgraded within the Python
-installation that would also be used to run it.
+For each package, the program determines the Python interpreter used to run the
+provided command. The program then upgrades the package using pip with that
+interpreter, to ensure that the package is upgraded within the Python
+installation that is also used to run it.
 
 options:
-    -h, --help  Display this message.
+    -c, --command  Specify the command associated with the package.
+    -h, --help     Display this message.
 "
 }
 
@@ -35,7 +36,19 @@ bad_usage() {
     exit 1
 }
 
+find_python() {
+    local filename= python=
+
+    filename="$(which "$1")" || error "$1: not on PATH"
+    python=$(sed -n '1s/^#!//p' "$filename")
+    $python -V >/dev/null 2>&1 || error "$1: cannot execute interpreter \"$python\""
+
+    echo "$python"
+}
+
 ### command line #######################################################
+
+command=
 
 while [ $# -gt 0 ]
 do
@@ -43,6 +56,20 @@ do
     shift
 
     case $option in
+        -c | --command)
+            [ $# -gt 0 ] || missing_arg "$option"
+            command="$1"
+            shift
+            ;;
+
+        --command=*)
+            command="${option#${option%%=*}=}"
+            ;;
+
+        -c*)
+            command="${option:2}"
+            ;;
+
         -h | --help)
             usage
             exit
@@ -69,13 +96,21 @@ done
 
 ### main ###############################################################
 
+if [ -n "$command" ]
+then
+    command_python="$(find_python "$command")"
+else
+    command_python=
+fi
+
 for package
 do
-    filename="$(which "$package")" || error "$package: not on PATH"
-
-    python=$(sed -n '1s/^#!//p' "$filename")
-
-    $python -V >/dev/null 2>&1 || error "$package: cannot execute interpreter \"$python\""
+    if [ -n "$command_python" ]
+    then
+        python="$command_python"
+    else
+        python="$(find_python "$package")"
+    fi
 
     $python -m pip install --upgrade "$package" || error "$package: upgrade failed"
 done
