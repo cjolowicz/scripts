@@ -177,8 +177,13 @@ original_branch=$(git rev-parse --abbrev-ref HEAD)
 
 git diff --quiet --exit-code || error "Working tree is not clean"
 
+package_pattern="[a-z][-a-z0-9]*"
+version_pattern="[0-9][.0-9a-z]*"
+separator_pattern="[ (!)]*"
+pattern="($package_pattern) +$separator_pattern$version_pattern +($version_pattern) +"
+
 poetry show --outdated --no-ansi |
-    awk '{ print $1, $3 }' |
+    sed -nr "s/^$pattern.*/\1 \2/p" |
     while read package version
 do
     is_requested "$package" || continue
