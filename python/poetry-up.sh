@@ -180,11 +180,11 @@ git diff --quiet --exit-code || error "Working tree is not clean"
 package_pattern="[a-z][-a-z0-9]*"
 version_pattern="[0-9][.0-9a-z]*"
 separator_pattern="[ (!)]*"
-pattern="($package_pattern) +$separator_pattern$version_pattern +($version_pattern) +"
+pattern="($package_pattern) +$separator_pattern($version_pattern) +($version_pattern) +"
 
 poetry show --outdated --no-ansi |
     sed -nr "s/^$pattern.*/\1 \2/p" |
-    while read package version
+    while read package oldversion version
 do
     is_requested "$package" || continue
 
@@ -245,7 +245,9 @@ do
 
     if $pull_request
     then
-        gh pr create --title="Upgrade to $package $version" --body=""
+        gh pr create \
+           --title="Upgrade to $package $version" \
+           --body="Upgrade $package from $oldversion to $version."
     fi
 
     echo
