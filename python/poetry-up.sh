@@ -189,7 +189,7 @@ separator_pattern="[ (!)]*"
 pattern="($package_pattern) +$separator_pattern($version_pattern) +($version_pattern) +"
 
 poetry show --outdated --no-ansi |
-    sed -nr "s/^$pattern.*/\1 \2/p" |
+    sed -nr "s/^$pattern.*/\1 \2 \3/p" |
     while read package oldversion version
 do
     is_requested "$package" || continue
