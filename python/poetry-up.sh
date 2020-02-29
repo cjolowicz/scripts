@@ -40,6 +40,7 @@ options:
     --no-push            Do not push the changes (default).
     --no-pull-request    Do not open a pull request (default).
     -r, --remote=REMOTE  Specify the remote to push to (default: origin).
+    -n, --dry-run        Just show what would be done.
     -h, --help           Display this message.
 "
 }
@@ -70,6 +71,7 @@ commit=true
 push=false
 pull_request=false
 remote=origin
+dry_run=false
 
 while [ $# -gt 0 ]
 do
@@ -121,6 +123,10 @@ do
 
         -r*)
             remote="${option:2}"
+            ;;
+
+        -n | --dry-run)
+            dry_run=true
             ;;
 
         -h | --help)
@@ -188,6 +194,12 @@ poetry show --outdated --no-ansi |
 do
     is_requested "$package" || continue
 
+    if $dry_run
+    then
+        echo "$package: $oldversion → $version"
+        continue
+    fi
+
     echo "==> $package $version <=="
     echo
 
@@ -253,7 +265,7 @@ do
     echo
 done
 
-if $commit || $push || $pull_request
+if ! $dry_run && ($commit || $push || $pull_request)
 then
     git switch "$original_branch"
 fi
