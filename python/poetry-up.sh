@@ -255,7 +255,7 @@ do
         git push --set-upstream "$remote" "$branch"
     fi
 
-    if $pull_request
+    if $pull_request && ! gh pr list 2>/dev/null | grep -q "$branch"
     then
         gh pr create \
            --title="Upgrade to $package $version" \
