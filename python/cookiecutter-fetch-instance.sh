@@ -6,6 +6,7 @@ program=$(basename $0)
 usage="\
 usage: $program --init [URL]
        $program
+       $program --delete
 
 Dependencies:
 
@@ -68,6 +69,15 @@ init() {
     git remote set-url --push instance none
 }
 
+delete() {
+    if git show-ref --verify --quiet refs/heads/instance
+    then
+        git branch --delete --force instance
+    fi
+
+    git remote remove instance
+}
+
 fetch() {
     git fetch --no-tags instance master
     git checkout -B instance instance/master
@@ -82,6 +92,11 @@ do
     case $option in
         --init)
             init "$@"
+            exit
+            ;;
+
+        --delete)
+            delete
             exit
             ;;
 
