@@ -76,9 +76,13 @@ fetch() {
         init
     fi
 
+    branch=$(git rev-parse --abbrev-ref HEAD)
+
     git fetch --no-tags instance master
     git switch --force-create instance instance/master
     git filter-repo "${filter_options[@]}"
+
+    git switch $branch
 }
 
 delete() {
