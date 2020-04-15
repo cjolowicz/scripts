@@ -78,6 +78,7 @@ fetch() {
     git switch --force-create instance instance/master
     git filter-repo "${filter_options[@]}"
 
+    git remote remove instance
     git switch $branch
 }
 
