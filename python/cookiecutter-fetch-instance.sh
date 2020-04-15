@@ -77,7 +77,7 @@ fetch() {
     fi
 
     git fetch --no-tags instance master
-    git checkout -B instance instance/master
+    git switch --force-create instance instance/master
     git filter-repo "${filter_options[@]}"
 }
 
