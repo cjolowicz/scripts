@@ -58,25 +58,21 @@ filter_options=(
     --message-callback="$message_callback"
 )
 
-init() {
-    if [ $# -eq 0 ]
-    then
-        url=${cookiecutter_url%.git}-instance.git
-    else
-        url="$1"
-    fi
-
-    git remote add instance $url
-    git remote set-url --push instance none
-}
-
 fetch() {
+    branch=$(git rev-parse --abbrev-ref HEAD)
+
     if ! git remote | grep -q '^instance$'
     then
-        init "$@"
-    fi
+        if [ $# -eq 0 ]
+        then
+            url=${cookiecutter_url%.git}-instance.git
+        else
+            url="$1"
+        fi
 
-    branch=$(git rev-parse --abbrev-ref HEAD)
+        git remote add instance $url
+        git remote set-url --push instance none
+    fi
 
     git fetch --no-tags instance master
     git switch --force-create instance instance/master
