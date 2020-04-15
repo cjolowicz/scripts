@@ -73,7 +73,7 @@ init() {
 fetch() {
     if ! git remote | grep -q '^instance$'
     then
-        init
+        init "$@"
     fi
 
     branch=$(git rev-parse --abbrev-ref HEAD)
