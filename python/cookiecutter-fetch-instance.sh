@@ -4,9 +4,10 @@ set -euo pipefail
 
 program=$(basename $0)
 usage="\
-usage: $program --init [URL]
-       $program
+usage:
+       $program [URL]
        $program --delete
+       $program --help
 
 Dependencies:
 
@@ -69,32 +70,40 @@ init() {
     git remote set-url --push instance none
 }
 
+fetch() {
+    if ! git remote | grep -q '^instance$'
+    then
+        init
+    fi
+
+    git fetch --no-tags instance master
+    git checkout -B instance instance/master
+    git filter-repo "${filter_options[@]}"
+}
+
 delete() {
     if git show-ref --verify --quiet refs/heads/instance
     then
         git branch --delete --force instance
     fi
 
-    git remote remove instance
-}
-
-fetch() {
-    git fetch --no-tags instance master
-    git checkout -B instance instance/master
-    git filter-repo "${filter_options[@]}"
+    if git remote | grep -q '^instance$'
+    then
+        git remote remove instance
+    fi
 }
 
 while [ $# -gt 0 ]
 do
+    if [ ${1::1} != - ]
+    then
+        break
+    fi
+
     option="$1"
     shift
 
     case $option in
-        --init)
-            init "$@"
-            exit
-            ;;
-
         --delete)
             delete
             exit
@@ -112,4 +121,4 @@ do
     esac
 done
 
-fetch
+fetch "$@"
