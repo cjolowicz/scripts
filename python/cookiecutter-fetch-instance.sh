@@ -6,8 +6,8 @@ program=$(basename $0)
 usage="\
 usage:
        $program [URL]
-       $program --delete
-       $program --help
+       $program --delete (-d)
+       $program --help (-h)
 
 Dependencies:
 
@@ -105,7 +105,7 @@ do
     shift
 
     case $option in
-        --delete)
+        --delete | -d)
             delete
             exit
             ;;
