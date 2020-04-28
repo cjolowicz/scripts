@@ -120,6 +120,12 @@ do
     esac
 done
 
+if $push && ! ($dunder || $commit || $tag)
+then
+    git push --follow-tags
+    exit
+fi
+
 [ $# -gt 0 ] || bad_usage "missing argument <version>"
 
 version=$1
