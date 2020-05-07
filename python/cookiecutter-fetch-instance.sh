@@ -5,7 +5,7 @@ set -euo pipefail
 program=$(basename $0)
 usage="\
 usage:
-       $program [URL]
+       $program [BRANCH] [URL]
        $program --delete (-d)
        $program --help (-h)
 
@@ -61,21 +61,30 @@ filter_options=(
 fetch() {
     branch=$(git rev-parse --abbrev-ref HEAD)
 
+    if [ $# -eq 0 ]
+    then
+        target=master
+    else
+        target="$1"
+        shift
+    fi
+
+    if [ $# -eq 0 ]
+    then
+        url=${cookiecutter_url%.git}-instance.git
+    else
+        url="$1"
+        shift
+    fi
+
     if ! git remote | grep -q '^instance$'
     then
-        if [ $# -eq 0 ]
-        then
-            url=${cookiecutter_url%.git}-instance.git
-        else
-            url="$1"
-        fi
-
         git remote add instance $url
         git remote set-url --push instance none
     fi
 
-    git fetch --no-tags instance master
-    git switch --force-create instance instance/master
+    git fetch --no-tags instance $target
+    git switch --force-create instance instance/$target
     git filter-repo "${filter_options[@]}"
 
     git remote remove instance
