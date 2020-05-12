@@ -140,13 +140,13 @@ do
             echo "## [$version] - $date"
             ;;
 
-        '[Unreleased]: '*)
+        '[unreleased]: '* | '[Unreleased]: '*)
             url=${line#*: }
             base_url=${url%/*}
             old_version=${url##*/v}
             old_version=${old_version%...*}
 
-            echo "[Unreleased]: $base_url/v$version...HEAD"
+            echo "[unreleased]: $base_url/v$version...HEAD"
             echo "[$version]: $base_url/v$old_version...v$version"
             ;;
 
