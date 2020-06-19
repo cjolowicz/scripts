@@ -93,7 +93,7 @@ do
             break
             ;;
 
-        -?)
+        -? | --*)
             bad_usage "unrecognized option \`$option'"
             ;;
 
