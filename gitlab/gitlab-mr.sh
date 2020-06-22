@@ -11,11 +11,14 @@ usage() {
 Push to GitLab, creating a merge request.
 
 options:
-    -c, --create               Create a merge request.
-    -t, --title=TEXT           Title for the merge request.
-    -d, --description=TEXT     Description for the merge request.
-    -m, --merge                Merge when pipeline succeeds.
-    -r, --remove-branch        Remove source branch.
+    -c, --create               Create a new merge request for the pushed branch.
+    -t, --title=TEXT           Set the title of the merge request.
+    -d, --description=TEXT     Set the description of the merge request.
+    -l, --label=TEXT           Add labels to the merge request. If the label does not exist, it will be created.
+    -u, --unlabel=TEXT         Remove labels from the merge request.
+    -m, --merge                Set the merge request to merge when its pipeline succeeds.
+    -r, --remove-branch        Set the merge request to remove the source branch when it’s merged.
+    -T, --target=TEXT          Set the target of the merge request to a particular branch.
     -o, --open                 Open merge request URL in browser.
     -h, --help                 Display this message.
 "
@@ -94,6 +97,48 @@ do
 
         -d*)
             options+=("--push-option=merge_request.description=${option:2}")
+            ;;
+
+        -l | --label)
+            [ $# -gt 0 ] || missing_arg "$option"
+            options+=("--push-option=merge_request.label=$1")
+            shift
+            ;;
+
+        --label=*)
+            options+=("--push-option=merge_request.label=${option#${option%%=*}=}")
+            ;;
+
+        -l*)
+            options+=("--push-option=merge_request.label=${option:2}")
+            ;;
+
+        -u | --unlabel)
+            [ $# -gt 0 ] || missing_arg "$option"
+            options+=("--push-option=merge_request.unlabel=$1")
+            shift
+            ;;
+
+        --unlabel=*)
+            options+=("--push-option=merge_request.unlabel=${option#${option%%=*}=}")
+            ;;
+
+        -u*)
+            options+=("--push-option=merge_request.unlabel=${option:2}")
+            ;;
+
+        -T | --target)
+            [ $# -gt 0 ] || missing_arg "$option"
+            options+=("--push-option=merge_request.target=$1")
+            shift
+            ;;
+
+        --target=*)
+            options+=("--push-option=merge_request.target=${option#${option%%=*}=}")
+            ;;
+
+        -T*)
+            options+=("--push-option=merge_request.target=${option:2}")
             ;;
 
         -h | --help)
