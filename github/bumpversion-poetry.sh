@@ -14,9 +14,8 @@ This is a front-end to \`poetry version\`. By default, it performs the
 following actions:
 
     1. Bump the version using Poetry.
-    2. Modify \`__version__\` in the package (optional).
-    3. Commit the changes.
-    4. Add a version tag.
+    2. Commit the changes.
+    3. Add a version tag.
 
 options:
     --dunder     Modify \`__version__\` in the package.
