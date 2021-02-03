@@ -7,6 +7,7 @@ import itertools
 import shlex
 import statistics
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -117,12 +118,12 @@ def main() -> None:
     paths = [Path(filename) for filename in args.files]
 
     if args.files_from:
-        paths.extend(
-            [
-                Path(filename)
-                for filename in Path(args.files_from).read_text().splitlines()
-            ]
+        text = (
+            sys.stdin.read()
+            if args.files_from == "-"
+            else Path(args.files_from).read_text()
         )
+        paths.extend([Path(filename) for filename in text.splitlines()])
 
     all_results = []
 
