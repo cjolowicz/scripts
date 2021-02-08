@@ -4,6 +4,7 @@ import argparse
 import datetime
 import difflib
 import itertools
+import locale
 import shlex
 import statistics
 import subprocess
@@ -22,7 +23,21 @@ def pairwise(iterable):
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    parser.add_argument(
+        "--encoding",
+        metavar="NAME",
+        default=locale.getpreferredencoding(),
+        help="encoding of command output",
+    )
+    parser.add_argument(
+        "--encoding-errors",
+        metavar="NAME",
+        default="strict",
+        help="error handling scheme when decoding text",
+    )
     parser.add_argument(
         "--command",
         "-c",
@@ -52,7 +67,7 @@ class Result:
     runtime: datetime.timedelta
 
 
-def run_command(command: str, path: Path) -> Result:
+def run_command(command: str, path: Path, *, encoding: str, errors: str) -> Result:
     if "{}" in command:
         full_command = command.replace("{}", str(path))
     else:
@@ -64,7 +79,8 @@ def run_command(command: str, path: Path) -> Result:
         shell=True,
         capture_output=True,
         text=True,
-        errors="surrogateescape",
+        encoding=encoding,
+        errors=errors,
     )
     runtime = datetime.datetime.now() - start
 
@@ -130,7 +146,12 @@ def main() -> None:
     for path in paths:
         print(f"==> {path} <==")
 
-        results = [run_command(command, path) for command in args.commands]
+        results = [
+            run_command(
+                command, path, encoding=args.encoding, errors=args.encoding_errors
+            )
+            for command in args.commands
+        ]
         all_results.append(results)
 
         for a, b in pairwise(results):
