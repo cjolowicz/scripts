@@ -26,7 +26,8 @@ then
 fi
 
 default=main
-branch=$(git rev-parse --abbrev-ref HEAD)
+branch=$(git symbolic-ref --short HEAD)
+upstream=$(git for-each-ref --format='%(upstream)' "refs/heads/$branch")
 
 if [ "$branch" != $default ]
 then
@@ -36,7 +37,18 @@ fi
 git fetch --prune --all
 git merge --ff-only
 
-if $delete && [ "$branch" != $default ]
+if $delete
 then
-    git branch --delete --force $branch
+    if [ "$branch" = "$default" ]
+    then
+        echo "refusing to delete default branch $branch" >&2
+    elif [ -z "$upstream" ]
+    then
+        echo "refusing to delete non-tracking branch $branch" >&2
+    elif git show-ref --verify --quiet "$upstream"
+    then
+        echo "refusing to delete branch $branch: upstream $upstream still exists" >&2
+    else
+        git branch --delete --force $branch
+    fi
 fi
