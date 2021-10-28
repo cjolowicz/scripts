@@ -33,5 +33,5 @@ fi
 git switch --create release-$version
 poetry version $version
 git add pyproject.toml
-git commit --message=":bookmark: Release $version"
+git commit --message="🔖 Release $version"
 gh pr create --title="Release $version" --body=
