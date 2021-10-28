@@ -5,7 +5,7 @@ usage: $(basename $0) [-D | --delete]
 1. Switch to the default branch.
 2. Fetch all remotes and prune branches.
 3. Fast-forward the default branch.
-4. Remove the old topic branch.
+4. (with --delete) Remove the old topic branch.
 "
 
 set -euo pipefail
