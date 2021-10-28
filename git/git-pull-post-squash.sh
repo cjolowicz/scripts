@@ -25,9 +25,9 @@ then
     esac
 fi
 
-remote=origin
-default=$(git remote show $remote | sed -n 's/  HEAD branch: //p')
 branch=$(git symbolic-ref --short HEAD)
+remote=$(git config --get branch.$branch.remote)
+default=$(git remote show $remote | sed -n 's/  HEAD branch: //p')
 upstream=$(git for-each-ref --format='%(upstream)' "refs/heads/$branch")
 
 if [ "$branch" != $default ]
