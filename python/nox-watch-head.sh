@@ -5,5 +5,5 @@ while :
 do
     ref=$(git symbolic-ref HEAD)
 
-    entr -ps "git show --no-patch --stat && nox $*" <<< ".git/$ref"
+    entr -ps "git show --stat && nox $*" <<< ".git/$ref"
 done
