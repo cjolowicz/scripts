@@ -5,7 +5,7 @@ while :
 do
     ref=$(git symbolic-ref HEAD)
 
-    entr -ps "git show --stat && nox $*" <<< ".git/$ref"
+    entr -s "git show --stat && nox $*" <<< ".git/$ref"
 
     if read -n1 -t.5 -s
     then
