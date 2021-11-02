@@ -3,7 +3,7 @@
 
 while :
 do
-    ref=$(git symbolic-ref HEAD)
+    ref=$(git symbolic-ref --quiet HEAD || echo HEAD)
 
     entr -s "git show --stat && nox $*" <<< ".git/$ref"
 
