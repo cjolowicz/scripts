@@ -2,22 +2,26 @@
 
 set -euo pipefail
 
-rebase=false
+command=
 
 if [ $# -gt 0 ]
 then
     case $1 in
         --rebase)
-            rebase=true
+            command=rebase
+            ;;
+
+        --cherry-pick)
+            command=cherry-pick
             ;;
     esac
 fi
 
-if $rebase
+if [ -n "$command" ]
 then
     while :
     do
-        if $0 && GIT_EDITOR=: git rebase --continue
+        if $0 && GIT_EDITOR=: git $command --continue
         then
             break
         fi
