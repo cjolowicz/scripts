@@ -26,7 +26,7 @@ then
 fi
 
 branch=$(git symbolic-ref --short HEAD)
-remote=$(git config --get branch.$branch.remote)
+remote=$(git config --get branch.$branch.remote) || remote=origin
 default=$(git remote show $remote | sed -n 's/  HEAD branch: //p')
 upstream=$(git for-each-ref --format='%(upstream)' "refs/heads/$branch")
 
