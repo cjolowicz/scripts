@@ -1,19 +1,65 @@
 #!/usr/bin/env python
 from __future__ import annotations
 
+import argparse
 import datetime
+import hashlib
+import json
 import os
 import sys
 import time
 from collections import Counter
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 from typing import Iterator
 
-
-import argparse
+import platformdirs
 import httpx
 
 
-def parse_link_header(response: httpx.Response) -> dict[str, int]:
+@dataclass
+class Page:
+    url: str
+    link: dict[str, str]
+    etag: str
+    results: Any
+    cached: bool
+
+
+def save_page_to_cache(page: Page) -> None:
+    """Store page in the cache."""
+    data = {
+        "url": page.url,
+        "link": page.link,
+        "etag": page.etag,
+        "results": page.results,
+    }
+
+    digest = hashlib.blake2b(page.url.encode()).hexdigest()
+    cachedir = Path(platformdirs.user_cache_dir("stardate"))
+    cache = cachedir / digest
+
+    cachedir.mkdir(parents=True, exist_ok=True)
+    with cache.open(mode="w") as io:
+        json.dump(data, io)
+
+
+def load_page_from_cache(url: str) -> Page | None:
+    """Load results from the cache."""
+    digest = hashlib.blake2b(url.encode()).hexdigest()
+    cachedir = Path(platformdirs.user_cache_dir("stardate"))
+    cache = cachedir / digest
+
+    if not cache.is_file():
+        return None
+
+    with cache.open() as io:
+        data = json.load(io)
+        return Page(data["url"], data["link"], data["etag"], data["results"], True)
+
+
+def parse_link_header(response: httpx.Response) -> dict[str, str]:
     """Parse the Link header."""
 
     def _() -> Iterator[tuple[str, str]]:
@@ -27,11 +73,10 @@ def parse_link_header(response: httpx.Response) -> dict[str, int]:
     return dict(_())
 
 
-def parse_starred_at(response: httpx.Response) -> list[datetime.date]:
+def parse_starred_at(data: Any) -> list[datetime.date]:
     """Parse the response."""
 
     def _() -> Iterator[datetime.date]:
-        data = response.json()
         assert isinstance(data, list), f"got {data = }"
         for stargazer in data:
             assert isinstance(stargazer, dict)
@@ -43,31 +88,55 @@ def parse_starred_at(response: httpx.Response) -> list[datetime.date]:
     return list(_())
 
 
-def get_star_dates_page(
-    url: str, *, token: str
-) -> tuple[list[datetime.date], str | None]:
-    """Download a URL."""
+def get_stargazers(url: str, *, token: str, etag: str | None) -> httpx.Response:
+    """Retrieve stargazers from the API."""
     print(url, file=sys.stderr)
 
     headers = {
         "Accept": "application/vnd.github.v3.star+json",
         "Authorization": f"token {token}",
     }
-    response = httpx.get(url, headers=headers, params={"per_page": 100})
-    response.raise_for_status()
 
-    dates = parse_starred_at(response)
-    rels = parse_link_header(response)
-    return dates, rels.get("next")
+    if etag:
+        headers |= {"If-None-Match": etag}
+
+    response = httpx.get(url, headers=headers, params={"per_page": 100})
+    if response.status_code != httpx.codes.NOT_MODIFIED:
+        response.raise_for_status()
+
+    return response
+
+
+def get_stargazers_page(url: str, *, token: str) -> Page:
+    """Retrieve stargazers from the cache or the API."""
+    page = load_page_from_cache(url)
+    etag = page.etag if page else None
+
+    response = get_stargazers(url, token=token, etag=etag)
+
+    if response.status_code != httpx.codes.NOT_MODIFIED:
+        etag = response.headers["ETag"]
+        link = parse_link_header(response)
+        page = Page(url, link, etag, response.json(), False)
+        save_page_to_cache(page)
+
+    return page
 
 
 def get_star_dates(repository: str, *, token: str) -> Iterator[datetime.date]:
     """Retrieve the star dates for a repository."""
     url: str | None = f"https://api.github.com/repos/{repository}/stargazers"
+    page: Page | None = None
+
     while url is not None:
-        dates, url = get_star_dates_page(url, token=token)
-        yield from dates
-        time.sleep(1)
+        if page and not page.cached:
+            time.sleep(1)
+
+        page = get_stargazers_page(url, token=token)
+
+        yield from parse_starred_at(page.results)
+
+        url = page.link.get("next")
 
 
 def print_star_dates(
