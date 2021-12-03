@@ -18,6 +18,7 @@ from typing import Any
 import platformdirs
 import httpx
 from matplotlib import pyplot
+from rich import print
 
 
 Results = list[dict[str, Any]]
@@ -96,8 +97,6 @@ def parse_starred_at(results: Results) -> list[datetime.datetime]:
 
 def request_stargazers(url: str, *, token: str, etag: str | None) -> httpx.Response:
     """Retrieve stargazers from the API."""
-    print(url, file=sys.stderr)
-
     headers = {
         "Accept": "application/vnd.github.v3.star+json",
         "Authorization": f"token {token}",
@@ -109,6 +108,8 @@ def request_stargazers(url: str, *, token: str, etag: str | None) -> httpx.Respo
     response = httpx.get(url, headers=headers, params={"per_page": 100})
     if response.status_code != httpx.codes.NOT_MODIFIED:
         response.raise_for_status()
+
+    print(f"{response.status_code} {url}", file=sys.stderr)
 
     return response
 
@@ -179,7 +180,7 @@ def plot_star_dates(
 def print_star_dates(counter: dict[datetime.datetime, int]) -> None:
     """Print the star dates for a repository."""
     for date, count in counter.items():
-        print(f"{date} {count}")
+        print(f"{date:%Y-%m-%d %H:%M:%S} {count}")
 
 
 def parse_interval(interval: str) -> datetime.timedelta:
