@@ -97,7 +97,9 @@ def parse_starred_at(results: Results) -> list[datetime.datetime]:
     return list(_())
 
 
-def request_stargazers(url: str, *, token: str, etag: str | None) -> httpx.Response:
+def request_stargazers(
+    url: str, *, token: str, etag: str | None, debug: bool = False
+) -> httpx.Response:
     """Retrieve stargazers from the API."""
     headers = {
         "Accept": "application/vnd.github.v3.star+json",
@@ -111,17 +113,18 @@ def request_stargazers(url: str, *, token: str, etag: str | None) -> httpx.Respo
     if response.status_code != httpx.codes.NOT_MODIFIED:
         response.raise_for_status()
 
-    print(f"{response.status_code} {url}", file=sys.stderr)
+    if debug:
+        print(f"{response.status_code} {url}", file=sys.stderr)
 
     return response
 
 
-def get_stargazers_page(url: str, *, token: str) -> Page:
+def get_stargazers_page(url: str, *, token: str, debug: bool = False) -> Page:
     """Retrieve stargazers from the cache or the API."""
     page = load_page_from_cache(url)
     etag = page.etag if page else None
 
-    response = request_stargazers(url, token=token, etag=etag)
+    response = request_stargazers(url, token=token, etag=etag, debug=debug)
 
     if response.status_code != httpx.codes.NOT_MODIFIED:
         etag = response.headers["ETag"]
@@ -132,7 +135,9 @@ def get_stargazers_page(url: str, *, token: str) -> Page:
     return page
 
 
-def get_star_dates(repository: str, *, token: str) -> Iterator[datetime.datetime]:
+def get_star_dates(
+    repository: str, *, token: str, debug: bool = False
+) -> Iterator[datetime.datetime]:
     """Retrieve the star dates for a repository."""
     url: str | None = f"https://api.github.com/repos/{repository}/stargazers"
     page: Page | None = None
@@ -141,7 +146,7 @@ def get_star_dates(repository: str, *, token: str) -> Iterator[datetime.datetime
         if page and not page.cached:
             time.sleep(1)
 
-        page = get_stargazers_page(url, token=token)
+        page = get_stargazers_page(url, token=token, debug=debug)
 
         yield from parse_starred_at(page.results)
 
@@ -226,11 +231,12 @@ def main() -> None:
     parser.add_argument("repository")
     parser.add_argument("-i", "--interval")
     parser.add_argument("--plot", action="store_true", default=False)
+    parser.add_argument("--debug", action="store_true", default=False)
 
     args = parser.parse_args()
     interval = parse_interval(args.interval)
 
-    dates = get_star_dates(args.repository, token=token)
+    dates = get_star_dates(args.repository, token=token, debug=args.debug)
     counter = aggregate_star_dates(dates, interval=interval)
 
     if args.plot:
