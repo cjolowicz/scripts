@@ -19,6 +19,8 @@ import platformdirs
 import httpx
 from matplotlib import pyplot
 from rich import print
+from rich.console import Console
+from rich.table import Table
 
 
 Results = list[dict[str, Any]]
@@ -177,10 +179,17 @@ def plot_star_dates(
     pyplot.show()
 
 
-def print_star_dates(counter: dict[datetime.datetime, int]) -> None:
+def print_star_dates(counter: dict[datetime.datetime, int], repository: str) -> None:
     """Print the star dates for a repository."""
+    table = Table(title=repository, min_width=len(repository) + 6)
+    table.add_column("Date")
+    table.add_column("Stars", justify="right")
+
     for date, count in counter.items():
-        print(f"{date:%Y-%m-%d %H:%M:%S} {count}")
+        table.add_row(f"{date:%Y-%m-%d %H:%M:%S}", f"{count}")
+
+    console = Console()
+    console.print(table)
 
 
 def parse_interval(interval: str) -> datetime.timedelta:
@@ -227,7 +236,7 @@ def main() -> None:
     if args.plot:
         plot_star_dates(counter, args.repository, interval=interval)
     else:
-        print_star_dates(counter)
+        print_star_dates(counter, args.repository)
 
 
 if __name__ == "__main__":
