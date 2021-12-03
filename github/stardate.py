@@ -18,12 +18,17 @@ import platformdirs
 import httpx
 
 
+Results = list[dict[str, Any]]
+
+
 @dataclass
 class Page:
+    """A page of results from the GitHub API."""
+
     url: str
     link: dict[str, str]
     etag: str
-    results: Any
+    results: Results
     cached: bool
 
 
@@ -73,22 +78,21 @@ def parse_link_header(response: httpx.Response) -> dict[str, str]:
     return dict(_())
 
 
-def parse_starred_at(data: Any) -> list[datetime.date]:
+def parse_starred_at(results: Results) -> list[datetime.datetime]:
     """Parse the response."""
 
-    def _() -> Iterator[datetime.date]:
-        assert isinstance(data, list), f"got {data = }"
-        for stargazer in data:
+    def _() -> Iterator[datetime.datetime]:
+        assert isinstance(results, list), f"got {results = }"
+        for stargazer in results:
             assert isinstance(stargazer, dict)
             starred_at = stargazer["starred_at"]
             assert isinstance(starred_at, str)
-            date = datetime.datetime.strptime(starred_at, "%Y-%m-%dT%H:%M:%SZ")
-            yield date.date()
+            yield datetime.datetime.fromisoformat(starred_at.replace("Z", "+00:00"))
 
     return list(_())
 
 
-def get_stargazers(url: str, *, token: str, etag: str | None) -> httpx.Response:
+def request_stargazers(url: str, *, token: str, etag: str | None) -> httpx.Response:
     """Retrieve stargazers from the API."""
     print(url, file=sys.stderr)
 
@@ -112,7 +116,7 @@ def get_stargazers_page(url: str, *, token: str) -> Page:
     page = load_page_from_cache(url)
     etag = page.etag if page else None
 
-    response = get_stargazers(url, token=token, etag=etag)
+    response = request_stargazers(url, token=token, etag=etag)
 
     if response.status_code != httpx.codes.NOT_MODIFIED:
         etag = response.headers["ETag"]
@@ -123,7 +127,7 @@ def get_stargazers_page(url: str, *, token: str) -> Page:
     return page
 
 
-def get_star_dates(repository: str, *, token: str) -> Iterator[datetime.date]:
+def get_star_dates(repository: str, *, token: str) -> Iterator[datetime.datetime]:
     """Retrieve the star dates for a repository."""
     url: str | None = f"https://api.github.com/repos/{repository}/stargazers"
     page: Page | None = None
@@ -139,28 +143,65 @@ def get_star_dates(repository: str, *, token: str) -> Iterator[datetime.date]:
         url = page.link.get("next")
 
 
+def truncate(
+    now: datetime.datetime, instant: datetime.datetime, interval: datetime.timedelta
+) -> datetime.datetime:
+    """Truncate an instant to the nearest interval."""
+    delta = now - instant
+    delta = interval * (delta // interval)
+    return now - delta
+
+
 def print_star_dates(
-    repository: str, *, token: str, week: bool
-) -> Iterator[datetime.date]:
-    """Retrieve the star dates for a repository."""
+    repository: str, *, token: str, interval: datetime.timedelta
+) -> None:
+    """Print the star dates for a repository."""
     dates = get_star_dates(repository, token=token)
-    if week:
-        counter = Counter(sorted((date.year, date.isocalendar()[1]) for date in dates))
-    else:
-        counter = Counter(sorted(dates))
+    now = datetime.datetime.now(datetime.timezone.utc)
+    counter = Counter(sorted(truncate(now, date, interval) for date in dates))
+
     for date, count in counter.items():
         print(f"{date} {count}")
+
+
+def parse_interval(interval: str) -> datetime.timedelta:
+    """Parse a time interval."""
+    if interval in ["Y", "year"]:
+        return datetime.timedelta(days=365)
+
+    if interval in ["m", "month"]:
+        return datetime.timedelta(days=31)
+
+    if interval in ["w", "week"]:
+        return datetime.timedelta(weeks=1)
+
+    if interval in ["d", "day"]:
+        return datetime.timedelta(days=1)
+
+    if interval in ["H", "hour"]:
+        return datetime.timedelta(hours=1)
+
+    if interval in ["M", "minute"]:
+        return datetime.timedelta(minutes=1)
+
+    if interval in ["S", "second"]:
+        return datetime.timedelta(seconds=1)
+
+    return datetime.timedelta(days=1)
 
 
 def main() -> None:
     """Main entry point."""
     token = os.environ["GITHUB_TOKEN"]
+
     parser = argparse.ArgumentParser()
     parser.add_argument("repository")
-    parser.add_argument("--week", action="store_true", default=False)
-    args = parser.parse_args()
+    parser.add_argument("-i", "--interval")
 
-    print_star_dates(args.repository, token=token, week=args.week)
+    args = parser.parse_args()
+    interval = parse_interval(args.interval)
+
+    print_star_dates(args.repository, token=token, interval=interval)
 
 
 if __name__ == "__main__":
