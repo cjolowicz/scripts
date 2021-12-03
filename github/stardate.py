@@ -9,10 +9,11 @@ import os
 import sys
 import time
 from collections import Counter
+from collections.abc import Iterable
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from typing import Iterator
 
 import platformdirs
 import httpx
@@ -154,19 +155,17 @@ def truncate(
 
 
 def aggregate_star_dates(
-    repository: str, *, token: str, interval: datetime.timedelta
+    dates: Iterable[datetime.datetime], interval: datetime.timedelta
 ) -> dict[datetime.datetime, int]:
     """Aggregate the star dates for a repository."""
-    dates = get_star_dates(repository, token=token)
     now = datetime.datetime.now(datetime.timezone.utc)
     return Counter(sorted(truncate(now, date, interval) for date in dates))
 
 
 def plot_star_dates(
-    repository: str, *, token: str, interval: datetime.timedelta
+    counter: dict[datetime.datetime, int], repository: str, interval: datetime.timedelta
 ) -> None:
     """Plot the star dates for a repository."""
-    counter = aggregate_star_dates(repository, token=token, interval=interval)
     pyplot.bar(
         counter.keys(),
         counter.values(),
@@ -177,11 +176,8 @@ def plot_star_dates(
     pyplot.show()
 
 
-def print_star_dates(
-    repository: str, *, token: str, interval: datetime.timedelta
-) -> None:
+def print_star_dates(counter: dict[datetime.datetime, int]) -> None:
     """Print the star dates for a repository."""
-    counter = aggregate_star_dates(repository, token=token, interval=interval)
     for date, count in counter.items():
         print(f"{date} {count}")
 
@@ -224,10 +220,13 @@ def main() -> None:
     args = parser.parse_args()
     interval = parse_interval(args.interval)
 
+    dates = get_star_dates(args.repository, token=token)
+    counter = aggregate_star_dates(dates, interval=interval)
+
     if args.plot:
-        plot_star_dates(args.repository, token=token, interval=interval)
+        plot_star_dates(counter, args.repository, interval=interval)
     else:
-        print_star_dates(args.repository, token=token, interval=interval)
+        print_star_dates(counter)
 
 
 if __name__ == "__main__":
