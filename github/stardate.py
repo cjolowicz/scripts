@@ -16,6 +16,7 @@ from typing import Iterator
 
 import platformdirs
 import httpx
+from matplotlib import pyplot
 
 
 Results = list[dict[str, Any]]
@@ -152,14 +153,35 @@ def truncate(
     return now - delta
 
 
+def aggregate_star_dates(
+    repository: str, *, token: str, interval: datetime.timedelta
+) -> dict[datetime.datetime, int]:
+    """Aggregate the star dates for a repository."""
+    dates = get_star_dates(repository, token=token)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    return Counter(sorted(truncate(now, date, interval) for date in dates))
+
+
+def plot_star_dates(
+    repository: str, *, token: str, interval: datetime.timedelta
+) -> None:
+    """Plot the star dates for a repository."""
+    counter = aggregate_star_dates(repository, token=token, interval=interval)
+    pyplot.bar(
+        counter.keys(),
+        counter.values(),
+        width=interval,
+        color=["cornflowerblue", "lightsteelblue"],
+    )
+    pyplot.title(repository)
+    pyplot.show()
+
+
 def print_star_dates(
     repository: str, *, token: str, interval: datetime.timedelta
 ) -> None:
     """Print the star dates for a repository."""
-    dates = get_star_dates(repository, token=token)
-    now = datetime.datetime.now(datetime.timezone.utc)
-    counter = Counter(sorted(truncate(now, date, interval) for date in dates))
-
+    counter = aggregate_star_dates(repository, token=token, interval=interval)
     for date, count in counter.items():
         print(f"{date} {count}")
 
@@ -197,11 +219,15 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("repository")
     parser.add_argument("-i", "--interval")
+    parser.add_argument("--plot", action="store_true", default=False)
 
     args = parser.parse_args()
     interval = parse_interval(args.interval)
 
-    print_star_dates(args.repository, token=token, interval=interval)
+    if args.plot:
+        plot_star_dates(args.repository, token=token, interval=interval)
+    else:
+        print_star_dates(args.repository, token=token, interval=interval)
 
 
 if __name__ == "__main__":
