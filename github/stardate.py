@@ -120,10 +120,15 @@ def request_stargazers(
     return response
 
 
-def get_stargazers_page(url: str, *, token: str, debug: bool = False) -> Page:
+def get_stargazers_page(
+    url: str, *, token: str, debug: bool = False, cache: bool = False
+) -> Page:
     """Retrieve stargazers from the cache or the API."""
     page = load_page_from_cache(url)
     etag = page.etag if page else None
+
+    if cache and page:
+        return page
 
     response = request_stargazers(url, token=token, etag=etag, debug=debug)
 
@@ -137,7 +142,12 @@ def get_stargazers_page(url: str, *, token: str, debug: bool = False) -> Page:
 
 
 def get_star_dates(
-    repository: str, *, token: str, console: Console, debug: bool = False
+    repository: str,
+    *,
+    token: str,
+    console: Console,
+    debug: bool = False,
+    cache: bool = False,
 ) -> Iterator[datetime.datetime]:
     """Retrieve the star dates for a repository."""
     url: str | None = f"https://api.github.com/repos/{repository}/stargazers"
@@ -148,7 +158,7 @@ def get_star_dates(
             if page and not page.cached:
                 time.sleep(1)
 
-            page = get_stargazers_page(url, token=token, debug=debug)
+            page = get_stargazers_page(url, token=token, debug=debug, cache=cache)
 
             yield from parse_starred_at(page.results)
 
@@ -237,13 +247,18 @@ def main() -> None:
     parser.add_argument("-i", "--interval")
     parser.add_argument("--plot", action="store_true", default=False)
     parser.add_argument("--debug", action="store_true", default=False)
+    parser.add_argument("--cache", action="store_true", default=False)
 
     args = parser.parse_args()
     interval = parse_interval(args.interval)
 
     console = Console()
     dates = get_star_dates(
-        args.repository, token=token, console=console, debug=args.debug
+        args.repository,
+        token=token,
+        console=console,
+        debug=args.debug,
+        cache=args.cache,
     )
     counter = aggregate_star_dates(dates, interval=interval)
 
