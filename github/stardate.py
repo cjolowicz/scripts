@@ -110,6 +110,7 @@ def request_stargazers(
         headers |= {"If-None-Match": etag}
 
     response = httpx.get(url, headers=headers, params={"per_page": 100})
+
     if response.status_code != httpx.codes.NOT_MODIFIED:
         response.raise_for_status()
 
@@ -136,21 +137,23 @@ def get_stargazers_page(url: str, *, token: str, debug: bool = False) -> Page:
 
 
 def get_star_dates(
-    repository: str, *, token: str, debug: bool = False
+    repository: str, *, token: str, console: Console, debug: bool = False
 ) -> Iterator[datetime.datetime]:
     """Retrieve the star dates for a repository."""
     url: str | None = f"https://api.github.com/repos/{repository}/stargazers"
     page: Page | None = None
 
-    while url is not None:
-        if page and not page.cached:
-            time.sleep(1)
+    with console.status(url) as status:
+        while url is not None:
+            if page and not page.cached:
+                time.sleep(1)
 
-        page = get_stargazers_page(url, token=token, debug=debug)
+            page = get_stargazers_page(url, token=token, debug=debug)
 
-        yield from parse_starred_at(page.results)
+            yield from parse_starred_at(page.results)
 
-        url = page.link.get("next")
+            url = page.link.get("next")
+            status.update(url)
 
 
 def truncate(
@@ -184,7 +187,9 @@ def plot_star_dates(
     pyplot.show()
 
 
-def print_star_dates(counter: dict[datetime.datetime, int], repository: str) -> None:
+def print_star_dates(
+    counter: dict[datetime.datetime, int], repository: str, *, console: Console
+) -> None:
     """Print the star dates for a repository."""
     table = Table(title=repository, min_width=len(repository) + 6)
     table.add_column("Date")
@@ -193,7 +198,7 @@ def print_star_dates(counter: dict[datetime.datetime, int], repository: str) -> 
     for date, count in counter.items():
         table.add_row(f"{date:%Y-%m-%d %H:%M:%S}", f"{count}")
 
-    console = Console()
+    print()
     console.print(table)
 
 
@@ -236,13 +241,16 @@ def main() -> None:
     args = parser.parse_args()
     interval = parse_interval(args.interval)
 
-    dates = get_star_dates(args.repository, token=token, debug=args.debug)
+    console = Console()
+    dates = get_star_dates(
+        args.repository, token=token, console=console, debug=args.debug
+    )
     counter = aggregate_star_dates(dates, interval=interval)
 
     if args.plot:
         plot_star_dates(counter, args.repository, interval=interval)
     else:
-        print_star_dates(counter, args.repository)
+        print_star_dates(counter, args.repository, console=console)
 
 
 if __name__ == "__main__":
