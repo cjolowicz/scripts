@@ -198,15 +198,24 @@ def plot_star_dates(
 
 
 def print_star_dates(
-    counter: dict[datetime.datetime, int], repository: str, *, console: Console
+    counter: dict[datetime.datetime, int],
+    repository: str,
+    *,
+    console: Console,
+    interval: datetime.timedelta,
 ) -> None:
     """Print the star dates for a repository."""
-    table = Table(title=repository, min_width=len(repository) + 6)
+    table = Table(title=repository)
     table.add_column("Date")
     table.add_column("Stars", justify="right")
 
+    if interval < datetime.timedelta(days=1):
+        dateformat = "%Y-%m-%d %H:%M:%S"
+    else:
+        dateformat = "%Y-%m-%d"
+
     for date, count in counter.items():
-        table.add_row(f"{date:%Y-%m-%d %H:%M:%S}", f"{count}")
+        table.add_row(f"{date:{dateformat}}", f"{count}")
 
     print()
     console.print(table)
@@ -265,7 +274,7 @@ def main() -> None:
     if args.plot:
         plot_star_dates(counter, args.repository, interval=interval)
     else:
-        print_star_dates(counter, args.repository, console=console)
+        print_star_dates(counter, args.repository, interval=interval, console=console)
 
 
 if __name__ == "__main__":
