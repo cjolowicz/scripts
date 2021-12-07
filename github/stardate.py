@@ -134,6 +134,13 @@ def get_stargazers_page(url: str, *, token: str, cache: bool = False) -> Page:
     return page
 
 
+def parse_page_parameter(url: str) -> int:
+    """Return the current page and total number of pages."""
+    query = httpx.URL(url).query.decode()
+    variables = dict(field.split("=") for field in query.split("&"))
+    return int(variables.get("page", "0"))
+
+
 def get_star_dates(
     repository: str, *, token: str, console: Console, cache: bool = False
 ) -> Iterator[datetime.datetime]:
@@ -141,17 +148,24 @@ def get_star_dates(
     url: str | None = f"https://api.github.com/repos/{repository}/stargazers"
     page: Page | None = None
 
-    with console.status(url) as status:
+    with console.status(f"Downloading stargazers for {repository}") as status:
         while url is not None:
-            if page and not page.cached:
-                time.sleep(1)
+            if page:
+                if last := page.link.get("last"):
+                    current = parse_page_parameter(url)
+                    total = parse_page_parameter(last)
+                    status.update(
+                        f"Downloading stargazers for {repository} (page {current} of {total})"
+                    )
+
+                if not page.cached:
+                    time.sleep(1)
 
             page = get_stargazers_page(url, token=token, cache=cache)
 
             yield from parse_starred_at(page.results)
 
             url = page.link.get("next")
-            status.update(url)
 
 
 def truncate(
