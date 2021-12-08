@@ -155,7 +155,8 @@ def get_star_dates(
                     current = parse_page_parameter(url)
                     total = parse_page_parameter(last)
                     status.update(
-                        f"Downloading stargazers for {repository} (page {current} of {total})"
+                        f"Downloading stargazers for {repository}"
+                        f" (page {current} of {total})"
                     )
 
                 if not page.cached:
