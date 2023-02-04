@@ -31,5 +31,6 @@ do
         echo "==> $package <=="
     fi
 
-    curl -fSsL https://pypi.python.org/pypi/$package/json | display
+    curl -fSsL https://pypi.org/pypi/$package/json | display
 done
+# curl -X GET https://pypi.org/simple/attrs/ -H "Accept:application/vnd.pypi.simple.v1+json" | display
