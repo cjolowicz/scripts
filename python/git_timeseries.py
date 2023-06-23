@@ -1,18 +1,4 @@
 """Plot the timeseries data from a git repository."""
-
-__pyproject__ = """
-[project]
-name = "git-timeseries"
-version = "0"
-requires_python = ">=3.9"
-dependencies = ["matplotlib"]
-scripts = {git-timeseries = "git_timeseries:main"}
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-"""
-
 import matplotlib.pyplot as plt
 from matplotlib.dates import DateFormatter
 
@@ -88,3 +74,17 @@ def main() -> None:
     data = aggregate_series(series, truncate)
 
     plot_series(data, width)
+
+
+__pyproject__ = """
+[project]
+name = "git-timeseries"
+version = "0"
+requires_python = ">=3.9"
+dependencies = ["matplotlib"]
+scripts = {git-timeseries = "git_timeseries:main"}
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+"""
