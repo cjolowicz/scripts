@@ -4,7 +4,7 @@ set -euo pipefail
 
 function header() {
     echo
-    echo "==> $* <=="
+    rich "[b]$*[/b]" --rule
     echo
 }
 
