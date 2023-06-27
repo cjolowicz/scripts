@@ -11,6 +11,12 @@ function header() {
 header "Homebrew"
 brew update && brew upgrade
 
+header "pipx"
+pipx upgrade-all --include-injected
+
+header "pip"
+py -m pip install --user --upgrade pip debugpy
+
 header "Spacemacs"
 git -C ~/.emacs.d fetch
 
