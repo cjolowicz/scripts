@@ -36,9 +36,10 @@ def main() -> None:
             "delta",
             "--line-numbers",
             "--line-numbers-right-format=",
-            str(adir),
-            str(bdir),
-        ]
+            str(adir.relative_to(tmpdir)),
+            str(bdir.relative_to(tmpdir)),
+        ],
+        cwd=tmpdir,
     )
 
 
