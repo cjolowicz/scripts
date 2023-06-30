@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 
-def get_coverage() -> dict[str, set[int]]:
+def get_coverage() -> dict[Path, set[int]]:
     process = subprocess.run(
         ["pipx", "run", "coverage", "json", "--fail-under=0", "-o-"],
         check=True,
@@ -26,11 +26,11 @@ def get_coverage() -> dict[str, set[int]]:
         return set(missing_lines) | {n for n, _ in missing_branches}
 
     return {
-        filename: missing(
+        Path(source): missing(
             result["missing_lines"],
             result["missing_branches"],
         )
-        for filename, result in data["files"].items()
+        for source, result in data["files"].items()
     }
 
 
@@ -46,12 +46,12 @@ def setup_directories() -> tuple[Path, Path]:
     return mkdir("a"), mkdir("b")
 
 
-def build_tree(coverage: dict[str, set[int]]) -> tuple[Path, Path]:
+def build_tree(coverage: dict[Path, set[int]]) -> tuple[Path, Path]:
     adir, bdir = setup_directories()
-    for filename, missing in coverage.items():
-        apath, bpath = adir / filename, bdir / filename
+    for source, missing in coverage.items():
+        apath, bpath = adir / source, bdir / source
         with apath.open(mode="w") as afile, bpath.open(mode="w") as bfile:
-            with Path(filename).open() as io:
+            with source.open() as io:
                 for number, line in enumerate(io, start=1):
                     afile.write(line)
                     if number not in missing:
