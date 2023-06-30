@@ -38,11 +38,12 @@ def setup_directories() -> None:
     tmpdir = Path("/tmp/coverage-blame")  # XXX chosen by fair dice roll
     shutil.rmtree(tmpdir, ignore_errors=True)
 
-    adir, bdir = tmpdir / "a", tmpdir / "b"
-    adir.mkdir(parents=True, exist_ok=True)
-    bdir.mkdir(parents=True, exist_ok=True)
+    def mkdir(name: str) -> Path:
+        path = tmpdir / name
+        path.mkdir(parents=True, exist_ok=True)
+        return path
 
-    return adir, bdir
+    return mkdir("a"), mkdir("b")
 
 
 def build_tree(coverage: dict[str, set[int]]) -> tuple[Path, Path]:
