@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Dependencies: pipx, git-delta
 import json
 import os
 import shutil
