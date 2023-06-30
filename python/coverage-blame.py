@@ -34,7 +34,7 @@ def get_coverage() -> dict[str, set[int]]:
     }
 
 
-def setup_directories() -> None:
+def setup_directories() -> tuple[Path, Path]:
     tmpdir = Path("/tmp/coverage-blame")  # XXX chosen by fair dice roll
     shutil.rmtree(tmpdir, ignore_errors=True)
 
@@ -49,13 +49,13 @@ def setup_directories() -> None:
 def build_tree(coverage: dict[str, set[int]]) -> tuple[Path, Path]:
     adir, bdir = setup_directories()
     for filename, missing in coverage.items():
-        afile, bfile = adir / filename, bdir / filename
-        with Path(filename).open() as io:
-            with afile.open(mode="w") as a, bfile.open(mode="w") as b:
+        apath, bpath = adir / filename, bdir / filename
+        with apath.open(mode="w") as afile, bpath.open(mode="w") as bfile:
+            with Path(filename).open() as io:
                 for number, line in enumerate(io, start=1):
-                    a.write(line)
+                    afile.write(line)
                     if number not in missing:
-                        b.write(line)
+                        bfile.write(line)
     return adir, bdir
 
 
