@@ -9,5 +9,6 @@ for file ; do
     name="$(basename "$file")"
     name="${name%.*}"
 
+    chmod a+x "$file"
     ln -s "$file" "$bindir"/"$name"
 done
