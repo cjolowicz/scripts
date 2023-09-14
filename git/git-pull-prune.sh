@@ -1,6 +1,6 @@
 #!/bin/bash
 usage="\
-usage: $(basename $0) [-D | --delete]
+usage: $(basename $0) [-D | --delete | --default BRANCH]
 
 1. Switch to the default branch.
 2. Fetch all remotes and prune branches.
@@ -10,14 +10,23 @@ usage: $(basename $0) [-D | --delete]
 
 set -euo pipefail
 
+default=
 delete=false
 
 if [ $# -gt 0 ]
 then
     case $1 in
+        --default)
+            shift
+            default="$1"
+            shift
+            ;;
+
         -D | --delete)
+            shift
             delete=true
             ;;
+
         *)
             echo "$usage"
             exit 1
@@ -26,8 +35,13 @@ then
 fi
 
 branch=$(git symbolic-ref --short HEAD)
-remote=$(git config --get branch.$branch.remote) || remote=origin
-default=$(git remote show $remote | sed -n 's/  HEAD branch: //p')
+
+if [ -z "$default" ]
+then
+    remote=$(git config --get branch.$branch.remote) || remote=origin
+    default=$(git remote show $remote | sed -n 's/  HEAD branch: //p')
+fi
+
 upstream=$(git for-each-ref --format='%(upstream)' "refs/heads/$branch")
 
 if [ "$branch" != $default ]
