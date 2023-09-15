@@ -13,8 +13,8 @@ set -euo pipefail
 default=
 delete=false
 
-if [ $# -gt 0 ]
-then
+while [ $# -gt 0 ]
+do
     case $1 in
         --default)
             shift
@@ -32,7 +32,7 @@ then
             exit 1
             ;;
     esac
-fi
+done
 
 branch=$(git symbolic-ref --short HEAD)
 
