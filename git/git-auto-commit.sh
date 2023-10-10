@@ -2,6 +2,16 @@
 
 set -euo pipefail
 
+case $1 in
+    --push)
+        push=true
+        shift
+        ;;
+
+    *)
+        push=false
+        ;;
+esac
 if [ $# -eq 0 ]
 then
     # Use xargs -n1 to avoid buffering.
@@ -13,3 +23,7 @@ do
     message=$(realpath --relative-to=. "$file")
     git commit --message="$message" "$file"
 done
+if $push
+then
+    git push
+fi
