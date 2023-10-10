@@ -20,7 +20,7 @@ fi
 
 for file
 do
-    message=$(realpath --relative-to=. "$file")
+    message="$(realpath --relative-to=. "$file")"
     git commit --message="$message" "$file"
 done
 if $push
