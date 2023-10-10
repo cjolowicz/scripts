@@ -4,10 +4,11 @@ set -euo pipefail
 
 program=$(basename $0)
 usage="\
-usage: $program [-n] [--dry-run] [--push]
+usage: $program [-n] [--dry-run] [--push] [--diff]
        $program [-h] --help
 "
 options=()
+diff=false
 dry_run=false
 push=false
 
@@ -22,6 +23,12 @@ do
         -n | --dry-run)
             options+=(--dry-run)
             dry_run=true
+            shift
+            ;;
+
+        --diff)
+            options+=(--diff)
+            diff=true
             shift
             ;;
 
@@ -81,6 +88,11 @@ fi
 
 for file
 do
+    if $diff
+    then
+        git diff -- "$file"
+    fi
+
     message="$(realpath --relative-to=. "$file")"
     $run git commit --message="$message" "$file"
 done
