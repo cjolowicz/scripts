@@ -2,45 +2,90 @@
 
 set -euo pipefail
 
-case $1 in
-    --push)
-        push=true
-        shift
-        ;;
+program=$(basename $0)
+usage="\
+usage: $program [-n] [--dry-run] [--push]
+       $program [-h] --help
+"
+options=()
+dry_run=false
+push=false
 
-    *)
-        push=false
-        ;;
-esac
+while [ $# -gt 0 ]
+do
+    case $1 in
+        -h | --help)
+            echo "$usage"
+            exit
+            ;;
+
+        -n | --dry-run)
+            options+=(--dry-run)
+            dry_run=true
+            shift
+            ;;
+
+        --push)
+            options+=(--push)
+            push=true
+            shift
+            ;;
+
+        *)
+            break
+            ;;
+    esac
+done
+
+fswatch_options=(
+    --print0
+    --recursive
+    --extended
+    --exclude='\.(git|venv|mypy_cache)'
+    --event Created
+    --event Updated
+    --event Removed
+    --event Renamed
+    --event MovedFrom
+    --event MovedTo
+    --event AttributeModified
+)
+
+xargs_options=(
+    --max-args=1  # Avoid buffering.
+    --null
+    --no-run-if-empty
+)
 
 if [ $# -eq 0 ]
 then
-    options=(
-        --recursive
-        --print0
-        --event Created
-        --event Updated
-        --event Removed
-        --event Renamed
-        --event MovedFrom
-        --event MovedTo
-        --event AttributeModified
-    )
-    # Use --max-args=1 to avoid buffering.
-    exec fswatch "${options[@]}" . |
-        xargs --max-args=1 --null git ls-files -z |
-        xargs --max-args=1 --null --no-run-if-empty "$0"
+    fswatch "${fswatch_options[@]}" . |
+        xargs "${xargs_options[@]}" git ls-files -z |
+        xargs "${xargs_options[@]}" "$0" "${options[@]}"
+
+    exit $?
 fi
 
-set -x
+status="$(git status --porcelain --untracked=no)"
+if [ -z "$status" ]
+then
+   exit
+fi
+
+if $dry_run
+then
+    run=echo
+else
+    run=
+fi
 
 for file
 do
     message="$(realpath --relative-to=. "$file")"
-    git commit --message="$message" "$file"
+    $run git commit --message="$message" "$file"
 done
 
 if $push
 then
-    git push
+    $run git push
 fi
