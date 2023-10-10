@@ -11,6 +11,7 @@ options=()
 diff=false
 dry_run=false
 push=false
+internal=false
 
 while [ $# -gt 0 ]
 do
@@ -18,6 +19,11 @@ do
         -h | --help)
             echo "$usage"
             exit
+            ;;
+
+        --internal)
+            internal=true
+            shift
             ;;
 
         -n | --dry-run)
@@ -64,13 +70,13 @@ xargs_options=(
     --no-run-if-empty
 )
 
-if [ $# -eq 0 ]
+if ! $internal
 then
     fswatch "${fswatch_options[@]}" . |
         xargs "${xargs_options[@]}" git ls-files -z |
-        xargs "${xargs_options[@]}" "$0" ${options[@]+"${options[@]}"}
+        xargs "${xargs_options[@]}" "$0" --internal ${options[@]+"${options[@]}"}
 
-    exit $?
+    exit
 fi
 
 status="$(git status --porcelain --untracked=no)"
