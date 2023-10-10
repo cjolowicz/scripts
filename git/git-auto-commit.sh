@@ -12,17 +12,34 @@ case $1 in
         push=false
         ;;
 esac
+
 if [ $# -eq 0 ]
 then
-    # Use xargs -n1 to avoid buffering.
-    exec fswatch -r0 . | xargs -n1 -0 git ls-files -z | xargs -n1 -0 "$0"
+    options=(
+        --recursive
+        --print0
+        --event Created
+        --event Updated
+        --event Removed
+        --event Renamed
+        --event MovedFrom
+        --event MovedTo
+        --event AttributeModified
+    )
+    # Use --max-args=1 to avoid buffering.
+    exec fswatch "${options[@]}" . |
+        xargs --max-args=1 --null git ls-files -z |
+        xargs --max-args=1 --null --no-run-if-empty "$0"
 fi
+
+set -x
 
 for file
 do
     message="$(realpath --relative-to=. "$file")"
     git commit --message="$message" "$file"
 done
+
 if $push
 then
     git push
