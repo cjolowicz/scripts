@@ -90,7 +90,7 @@ for file
 do
     if $diff
     then
-        git diff -- "$file"
+        env DELTA_PAGER=cat git diff -- "$file"
     fi
 
     message="$(realpath --relative-to=. "$file")"
