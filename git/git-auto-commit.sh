@@ -68,7 +68,7 @@ if [ $# -eq 0 ]
 then
     fswatch "${fswatch_options[@]}" . |
         xargs "${xargs_options[@]}" git ls-files -z |
-        xargs "${xargs_options[@]}" "$0" "${options[@]}"
+        xargs "${xargs_options[@]}" "$0" ${options[@]+"${options[@]}"}
 
     exit $?
 fi
