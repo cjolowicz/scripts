@@ -58,8 +58,5 @@ brew update && brew upgrade
 header "pipx"
 pipx upgrade-all --include-injected
 
-header "pip"
-py -m pip install --user --upgrade pip debugpy
-
 header "Emacs"
 git-update ~/.emacs.d develop
