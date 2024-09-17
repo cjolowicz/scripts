@@ -2,9 +2,20 @@
 
 set -euo pipefail
 
+program=$(basename $0)
+usage="\
+usage: $program [<task>..]
+       $program --list
+
+options:
+
+  -l, --list   list the available tasks
+  -h, --help   show this message and exit
+"
+
 function header() {
     echo
-    rich "[b]$*[/b]" --rule
+    rich --emoji --width 72 "[b]$*[/b]" --rule
     echo
 }
 
@@ -46,17 +57,128 @@ function git-update() {
     )
 }
 
-header "cjolowicz/dotfiles"
-git-update ~/Code/github.com/cjolowicz/dotfiles
+function do_dotfiles() {
+    git-update ~/Code/github.com/cjolowicz/dotfiles
+}
 
-header "cjolowicz/scripts"
-git-update ~/Code/github.com/cjolowicz/scripts master
+function do_scripts() {
+    git-update ~/Code/github.com/cjolowicz/scripts master
+}
 
-header "Homebrew"
-brew update && brew upgrade
+function do_brew() {
+    brew update
+    brew upgrade
+}
 
-header "pipx"
-pipx upgrade-all --include-injected
+function do_pipx() {
+    pipx upgrade-all --include-injected
+}
 
-header "Emacs"
-git-update ~/.emacs.d develop
+function do_emacs() {
+    echo >&2
+    echo "==> Upgrading ~/.emacs... <==" >&2
+    echo >&2
+
+    git-update ~/.emacs.d develop
+
+    echo >&2
+    echo "==> Updating packages... <==" >&2
+    echo >&2
+
+    emacs --batch -l ~/.emacs.d/init.el --eval="(configuration-layer/update-packages t)"
+
+    echo >&2
+    echo "==> Upgrading packages... <==" >&2
+    echo >&2
+
+    emacs --batch -l ~/.emacs.d/init.el
+}
+
+function do_go() {
+    local old=$(go version | cut -d' ' -f3)
+    local new=$(curl --silent 'https://go.dev/VERSION?m=text' | grep -Eo 'go[0-9]+(\.[0-9]+)+')
+
+    if [ $old = "$new" ]
+    then
+        echo "The local Go version ${old} is up-to-date."
+    else
+        echo "The local Go version is ${old}. A new release ${new} is available."
+
+        release="${new}.linux-amd64.tar.gz"
+
+        tmpdir=$(mktemp -d)
+        trap 'rm -rf $tmpdir' 0
+
+        curl -L https://go.dev/dl/$release --output $tmpdir/$release
+        sudo rm -rf /usr/local/go
+        sudo tar -C /usr/local -xzf $tmpdir/$release
+
+        go version
+    fi
+}
+
+function do_volta() {
+    curl https://get.volta.sh | bash
+}
+
+function do_rust() {
+    rustup update
+}
+
+function do_cargo() {
+    cargo install $(cargo install --list | awk '/:$/ { print $1; }')
+}
+
+tasks=(
+    brew
+    go
+    emacs
+    pipx
+    dotfiles
+    scripts
+    volta
+    rust
+    cargo
+)
+
+case ${1:-} in
+    --help | -h)
+        echo "$usage" >&2
+        exit
+        ;;
+
+    --list | -l)
+        for task in "${tasks[@]}"
+        do
+            echo $task
+        done
+
+        exit
+        ;;
+esac
+
+[ $# -gt 0 ] || set -- "${tasks[@]}"
+
+status=0
+
+for task
+do
+    if [[ " ${tasks[@]} " =~ " ${task} " ]]
+    then
+        header "$task"
+
+        if ! do_$task
+        then
+            echo "task $task failed" >&2
+            status=1
+        fi
+    else
+        echo "unknown task: $task" >&2
+    fi
+done
+
+sparkles=":sparkle: :sparkle: :sparkle:"
+
+header " $sparkles  done  $sparkles "
+
+exit $status
