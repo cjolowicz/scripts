@@ -98,13 +98,13 @@ function do_go() {
     local old=$(go version | cut -d' ' -f3)
     local new=$(curl --silent 'https://go.dev/VERSION?m=text' | grep -Eo 'go[0-9]+(\.[0-9]+)+')
 
-    if [ $old = "$new" ]
+    if [ "$old" = "$new" ]
     then
         echo "The local Go version ${old} is up-to-date."
     else
         echo "The local Go version is ${old}. A new release ${new} is available."
 
-        release="${new}.linux-amd64.tar.gz"
+        release="${new}.darwin-arm64.tar.gz"
 
         tmpdir=$(mktemp -d)
         trap 'rm -rf $tmpdir' 0
