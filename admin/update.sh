@@ -130,6 +130,7 @@ function do_cargo() {
 }
 
 function do_uv() {
+    uv self update
     uv tool upgrade --all
 }
 
