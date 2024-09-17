@@ -110,8 +110,8 @@ function do_go() {
         trap 'rm -rf $tmpdir' 0
 
         curl -L https://go.dev/dl/$release --output $tmpdir/$release
-        sudo rm -rf /usr/local/go
-        sudo tar -C /usr/local -xzf $tmpdir/$release
+        rm -rf /usr/local/go
+        tar -C /usr/local -xzf $tmpdir/$release
 
         go version
     fi
