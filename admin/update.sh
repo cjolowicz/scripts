@@ -129,6 +129,10 @@ function do_cargo() {
     cargo install $(cargo install --list | awk '/:$/ { print $1; }')
 }
 
+function do_uv() {
+    uv tool upgrade --all
+}
+
 tasks=(
     brew
     go
@@ -139,6 +143,7 @@ tasks=(
     volta
     rust
     cargo
+    uv
 )
 
 case ${1:-} in
