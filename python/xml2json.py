@@ -13,7 +13,7 @@ import xmlschema
 
 
 class DecimalEncoder(json.JSONEncoder):
-    def default(self, o):
+    def default(self, o: object) -> object:
         if isinstance(o, decimal.Decimal):
             return str(o)
         return super().default(o)
