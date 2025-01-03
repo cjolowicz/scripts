@@ -111,6 +111,10 @@ function do_uv() {
     uv tool upgrade --all
 }
 
+function do_gcloud() {
+    gcloud components update
+}
+
 tasks=(
     brew
     emacs
@@ -121,6 +125,7 @@ tasks=(
     rust
     cargo
     uv
+    gcloud
 )
 
 case ${1:-} in
