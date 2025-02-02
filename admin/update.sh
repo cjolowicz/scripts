@@ -70,10 +70,6 @@ function do_brew() {
     brew upgrade
 }
 
-function do_pipx() {
-    pipx upgrade-all --include-injected
-}
-
 function do_emacs() {
     echo >&2
     echo "==> Upgrading ~/.emacs... <==" >&2
@@ -118,7 +114,6 @@ function do_gcloud() {
 tasks=(
     brew
     emacs
-    pipx
     dotfiles
     scripts
     volta
