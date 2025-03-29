@@ -68,6 +68,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--from",
+        "-f",
         default="1 day ago",
         dest="from_",
         metavar="<when>",
@@ -75,12 +76,16 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--to",
+        "-t",
         default="now",
         metavar="<when>",
         help="end of time range in human-readable form  [now]",
     )
     parser.add_argument(
-        "--dry-run", action="store_true", help="print the request body without sending"
+        "--dry-run",
+        "-n",
+        action="store_true",
+        help="print the request body without sending",
     )
     return parser.parse_args()
 
