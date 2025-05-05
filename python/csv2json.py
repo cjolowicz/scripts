@@ -39,14 +39,14 @@ def main() -> None:
         "infile", nargs="?", type=argparse.FileType("r"), default=sys.stdin
     )
     parser.add_argument(
-        "outfile", nargs="?", type=argparse.FileType("w"), default=sys.stdout
+        "--output", "-o", type=argparse.FileType("w"), default=sys.stdout
     )
     args = parser.parse_args()
 
     if args.format == "json":
-        to_json(args.infile, args.outfile)
+        to_json(args.infile, args.output)
     elif args.format == "csv":
-        from_json(args.infile, args.outfile)
+        from_json(args.infile, args.output)
     else:
         sys.exit("unknown format: {args.format}")
 
