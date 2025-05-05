@@ -35,12 +35,18 @@ def main() -> None:
         default="json",
         help="output format, either 'json' or 'csv'",
     )
+    parser.add_argument(
+        "infile", nargs="?", type=argparse.FileType("r"), default=sys.stdin
+    )
+    parser.add_argument(
+        "outfile", nargs="?", type=argparse.FileType("w"), default=sys.stdout
+    )
     args = parser.parse_args()
 
     if args.format == "json":
-        to_json(sys.stdin, sys.stdout)
+        to_json(args.infile, args.outfile)
     elif args.format == "csv":
-        from_json(sys.stdin, sys.stdout)
+        from_json(args.infile, args.outfile)
     else:
         sys.exit("unknown format: {args.format}")
 
