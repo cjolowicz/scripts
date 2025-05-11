@@ -48,7 +48,7 @@ def main() -> None:
     elif args.format == "csv":
         from_json(args.infile, args.output)
     else:
-        sys.exit("unknown format: {args.format}")
+        sys.exit(f"unknown format: {args.format}")
 
 
 if __name__ == "__main__":
