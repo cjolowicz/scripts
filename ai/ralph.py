@@ -66,12 +66,26 @@ def abbreviate(value: object, *, maxlen: int = 80) -> str:
     return text
 
 
-def format_tool_input(input_data: dict[str, object]) -> str:
-    """Format tool input parameters as indented single-line entries."""
-    lines = []
-    for key, value in input_data.items():
-        lines.append(f"    {key}: {abbreviate(value)}")
-    return "\n".join(lines)
+TOOL_SUMMARY_KEYS: dict[str, str] = {
+    "Bash": "command",
+    "Read": "file_path",
+    "Edit": "file_path",
+    "Write": "file_path",
+    "Glob": "pattern",
+    "Grep": "pattern",
+    "Agent": "prompt",
+}
+
+
+def format_tool_call(name: str, tool_input: dict[str, object]) -> str:
+    """Format a tool invocation as a one-liner like Name(summary)."""
+    key = TOOL_SUMMARY_KEYS.get(name)
+    if key is not None and key in tool_input:
+        return f"{name}({abbreviate(tool_input[key])})"
+    if tool_input:
+        first_value = next(iter(tool_input.values()))
+        return f"{name}({abbreviate(first_value)})"
+    return f"{name}()"
 
 
 def handle_text_block(text: str, *, after_tools: bool) -> None:
@@ -89,9 +103,8 @@ def handle_tool_block(
     after_text: bool,
 ) -> None:
     """Display a tool invocation block."""
-    params = format_tool_input(tool_input)
     prefix = "\n" if after_text else ""
-    sys.stderr.write(f"{prefix}  > {name}\n{params}\n")
+    sys.stderr.write(f"{prefix}  {format_tool_call(name, tool_input)}\n")
     sys.stderr.flush()
 
 
