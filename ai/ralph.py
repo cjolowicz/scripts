@@ -58,41 +58,74 @@ def forward_lines(
         buf.append(line)
 
 
+def abbreviate(value: object, *, maxlen: int = 80) -> str:
+    """Return a single-line repr of value, abbreviated if needed."""
+    text = repr(value)
+    if len(text) > maxlen:
+        return text[: maxlen - 3] + "..."
+    return text
+
+
 def format_tool_input(input_data: dict[str, object]) -> str:
-    """Format tool input parameters as indented YAML-like lines."""
+    """Format tool input parameters as indented single-line entries."""
     lines = []
     for key, value in input_data.items():
-        if isinstance(value, str) and len(value) > 80:  # noqa: PLR2004
-            value = value[:77] + "..."  # noqa: PLW2901
-        lines.append(f"  {key}: {value}")
+        lines.append(f"    {key}: {abbreviate(value)}")
     return "\n".join(lines)
 
 
-def handle_event(event: dict[str, object]) -> str | None:
-    """Handle a single stream-json event. Return result text if final."""
+def handle_text_block(text: str, *, after_tools: bool) -> None:
+    """Display a text block, adding a blank line separator after tool blocks."""
+    if after_tools:
+        sys.stderr.write("\n")
+    sys.stdout.write(text + "\n")
+    sys.stdout.flush()
+
+
+def handle_tool_block(
+    name: str,
+    tool_input: dict[str, object],
+    *,
+    after_text: bool,
+) -> None:
+    """Display a tool invocation block."""
+    params = format_tool_input(tool_input)
+    prefix = "\n" if after_text else ""
+    sys.stderr.write(f"{prefix}  > {name}\n{params}\n")
+    sys.stderr.flush()
+
+
+def handle_event(
+    event: dict[str, object],
+    *,
+    last_block: str,
+) -> tuple[str | None, str]:
+    """Handle a single stream-json event. Return (result, last_block_type)."""
     match event:
         case {"type": "assistant", "message": {"content": list(blocks)}}:
             for block in blocks:
                 match block:
                     case {"type": "text", "text": str(text)}:
-                        sys.stdout.write(text + "\n")
-                        sys.stdout.flush()
+                        handle_text_block(text, after_tools=last_block == "tool")
+                        last_block = "text"
                     case {
                         "type": "tool_use",
                         "name": str(name),
                         "input": dict(tool_input),
                     }:
-                        params = format_tool_input(tool_input)
-                        sys.stderr.write(f"> {name}\n{params}\n")
-                        sys.stderr.flush()
+                        handle_tool_block(
+                            name, tool_input, after_text=last_block == "text",
+                        )
+                        last_block = "tool"
         case {"type": "result", "result": str(result)}:
-            return result
-    return None
+            return result, last_block
+    return None, last_block
 
 
 def handle_events(lines: Iterable[str]) -> str:
     """Parse and handle stream-json events, returning the final result text."""
     result_text = ""
+    last_block = ""
     for line in lines:
         line = line.strip()  # noqa: PLW2901
         if not line:
@@ -102,7 +135,7 @@ def handle_events(lines: Iterable[str]) -> str:
         except json.JSONDecodeError:
             continue
 
-        result = handle_event(event)
+        result, last_block = handle_event(event, last_block=last_block)
         if result is not None:
             result_text = result
 
