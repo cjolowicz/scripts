@@ -59,13 +59,13 @@ def forward_lines(
 
 
 def format_tool_input(input_data: dict[str, object]) -> str:
-    """Format tool input parameters for display."""
-    parts = []
+    """Format tool input parameters as indented YAML-like lines."""
+    lines = []
     for key, value in input_data.items():
         if isinstance(value, str) and len(value) > 80:  # noqa: PLR2004
             value = value[:77] + "..."  # noqa: PLW2901
-        parts.append(f"{key}={value}")
-    return ", ".join(parts)
+        lines.append(f"  {key}: {value}")
+    return "\n".join(lines)
 
 
 def handle_event(event: dict[str, object]) -> str | None:
@@ -82,7 +82,9 @@ def handle_event(event: dict[str, object]) -> str | None:
                         "name": str(name),
                         "input": dict(tool_input),
                     }:
-                        print_message(f"tool: {name}({format_tool_input(tool_input)})")
+                        params = format_tool_input(tool_input)
+                        sys.stderr.write(f"> {name}\n{params}\n")
+                        sys.stderr.flush()
         case {"type": "result", "result": str(result)}:
             return result
     return None
