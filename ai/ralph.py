@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 import threading
@@ -12,6 +13,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import io
+    from collections.abc import Iterable
 
 
 PROGRAM = "ralph"
@@ -28,6 +30,15 @@ If there is truly nothing left to do at the START of this invocation, output
 invocation with a fresh context window confirms completion.
 </termination>
 """
+COMPLETION_MARKER = "<promise>COMPLETE</promise>"
+CLAUDE_CMD = [
+    "claude",
+    "--dangerously-skip-permissions",
+    "--print",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+]
 
 
 def print_message(text: str) -> None:
@@ -47,10 +58,59 @@ def forward_lines(
         buf.append(line)
 
 
-def stream_command(cmd: list[str], input_data: str) -> tuple[str, str]:
-    """Run a command, streaming stdout and stderr, and return both as strings."""
+def format_tool_input(input_data: dict[str, object]) -> str:
+    """Format tool input parameters for display."""
+    parts = []
+    for key, value in input_data.items():
+        if isinstance(value, str) and len(value) > 80:  # noqa: PLR2004
+            value = value[:77] + "..."  # noqa: PLW2901
+        parts.append(f"{key}={value}")
+    return ", ".join(parts)
+
+
+def handle_event(event: dict[str, object]) -> str | None:
+    """Handle a single stream-json event. Return result text if final."""
+    match event:
+        case {"type": "assistant", "message": {"content": list(blocks)}}:
+            for block in blocks:
+                match block:
+                    case {"type": "text", "text": str(text)}:
+                        sys.stdout.write(text + "\n")
+                        sys.stdout.flush()
+                    case {
+                        "type": "tool_use",
+                        "name": str(name),
+                        "input": dict(tool_input),
+                    }:
+                        print_message(f"tool: {name}({format_tool_input(tool_input)})")
+        case {"type": "result", "result": str(result)}:
+            return result
+    return None
+
+
+def handle_events(lines: Iterable[str]) -> str:
+    """Parse and handle stream-json events, returning the final result text."""
+    result_text = ""
+    for line in lines:
+        line = line.strip()  # noqa: PLW2901
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+
+        result = handle_event(event)
+        if result is not None:
+            result_text = result
+
+    return result_text
+
+
+def stream_claude(input_data: str) -> str:
+    """Run claude with stream-json, display events, and return output text."""
     proc = subprocess.Popen(  # noqa: S603
-        cmd,
+        CLAUDE_CMD,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -63,43 +123,25 @@ def stream_command(cmd: list[str], input_data: str) -> tuple[str, str]:
     proc.stdin.write(input_data)
     proc.stdin.close()
 
-    stdout_lines: list[str] = []
     stderr_lines: list[str] = []
-
-    stdout_thread = threading.Thread(
-        target=forward_lines,
-        args=(proc.stdout, sys.stdout, stdout_lines),
-    )
     stderr_thread = threading.Thread(
         target=forward_lines,
         args=(proc.stderr, sys.stderr, stderr_lines),
     )
-
-    stdout_thread.start()
     stderr_thread.start()
-    stdout_thread.join()
+
+    result_text = handle_events(proc.stdout)
+
     stderr_thread.join()
     proc.wait()
+    return result_text
 
-    return "".join(stdout_lines), "".join(stderr_lines)
 
-
-def run_iteration(tool: str, *, prompt: str) -> bool:
-    """Run a single iteration of the selected AI tool. Return True if complete."""
-    if tool == "amp":
-        cmd = ["amp", "--dangerously-allow-all"]
-    elif tool == "claude":
-        cmd = ["claude", "--dangerously-skip-permissions", "--print"]
-    elif tool == "opencode":
-        cmd = ["opencode", "run"]
-    else:
-        msg = f"unknown tool: {tool}"
-        raise AssertionError(msg)
-
+def run_iteration(prompt: str) -> bool:
+    """Run a single iteration of claude. Return True if complete."""
     input_data = PROMPT_TEMPLATE.format(prompt=prompt)
-    stdout, stderr = stream_command(cmd, input_data)
-    output = stdout + stderr
-    return "<promise>COMPLETE</promise>" in output
+    output = stream_claude(input_data)
+    return COMPLETION_MARKER in output
 
 
 def parse_args() -> argparse.Namespace:
@@ -107,7 +149,6 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Ralph Wiggum - Long-running AI agent loop",
     )
-    parser.add_argument("--tool", choices=["amp", "claude", "opencode"], default="amp")
     parser.add_argument("prompt")
     parser.add_argument("-n", "--max-iterations", type=int, default=10)
     return parser.parse_args()
@@ -119,10 +160,10 @@ def main() -> None:
 
     for i in range(1, args.max_iterations + 1):
         print_message(SEPARATOR)
-        print_message(f"iteration {i}/{args.max_iterations} [{args.tool}]")
+        print_message(f"iteration {i}/{args.max_iterations}")
         print_message(SEPARATOR)
 
-        complete = run_iteration(args.tool, prompt=args.prompt)
+        complete = run_iteration(args.prompt)
 
         if complete:
             print_message(f"complete at iteration {i}/{args.max_iterations}")
