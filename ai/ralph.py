@@ -262,4 +262,8 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print_message("interrupted")
+        sys.exit(130)
