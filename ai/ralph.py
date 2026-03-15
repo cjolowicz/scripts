@@ -1,4 +1,9 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["rich"]
+# ///
+# ruff: noqa: EXE003
 """Ralph Wiggum - Long-running AI agent loop."""
 
 from __future__ import annotations
@@ -119,12 +124,20 @@ def format_tool_call(name: str, tool_input: dict[str, object]) -> str:
     return f"{name}()"
 
 
+def render_markdown(text: str) -> None:
+    """Render markdown text to the terminal using rich."""
+    from rich.console import Console  # type: ignore[import-untyped]
+    from rich.markdown import Markdown  # type: ignore[import-untyped]
+
+    console = Console()
+    console.print(Markdown(text))
+
+
 def handle_text_block(text: str, *, after_tools: bool) -> None:
     """Display a text block, adding a blank line separator after tool blocks."""
     if after_tools:
         sys.stderr.write("\n")
-    sys.stdout.write(text + "\n")
-    sys.stdout.flush()
+    render_markdown(text)
 
 
 def handle_tool_block(
