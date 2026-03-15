@@ -16,7 +16,6 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
 
-PROGRAM = "ralph"
 SEPARATOR = "─" * 63
 BOLD = "\033[1m"
 DIM = "\033[2m"
@@ -60,7 +59,10 @@ CLAUDE_CMD = [
 
 def print_message(text: str) -> None:
     """Print a user-facing message to stderr."""
-    print(f"{DIM}{PROGRAM}:{RESET} {text}", file=sys.stderr)  # noqa: T201
+    print(  # noqa: T201
+        f"\n{DIM}{SEPARATOR}{RESET}\n{text}\n{DIM}{SEPARATOR}{RESET}\n",
+        file=sys.stderr,
+    )
 
 
 def forward_lines(
@@ -240,9 +242,7 @@ def main() -> None:
     args = parse_args()
 
     for i in range(1, args.max_iterations + 1):
-        print_message(f"{DIM}{SEPARATOR}{RESET}")
         print_message(f"{BOLD}iteration {i}/{args.max_iterations}{RESET}")
-        print_message(f"{DIM}{SEPARATOR}{RESET}")
 
         status = run_iteration(args.prompt)
 
