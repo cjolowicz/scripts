@@ -14,6 +14,7 @@ import subprocess
 import sys
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -24,8 +25,8 @@ from rich.syntax import Syntax  # type: ignore[import-untyped]
 from rich.text import Text  # type: ignore[import-untyped]
 
 if TYPE_CHECKING:
-    import io
-    from collections.abc import Iterable
+    from collections.abc import Generator, Iterable
+    from typing import IO
 
 
 SEPARATOR = "─" * 63
@@ -77,16 +78,11 @@ def print_message(text: str) -> None:
     )
 
 
-def forward_lines(
-    reader: io.TextIOWrapper,
-    writer: io.TextIOWrapper,
-    buf: list[str],
-) -> None:
-    """Forward lines from reader to writer, accumulating them in buf."""
+def forward_lines(reader: IO[str], writer: IO[str]) -> None:
+    """Forward lines from reader to writer."""
     for line in reader:
         writer.write(line)
         writer.flush()
-        buf.append(line)
 
 
 def shorten_path(value: str) -> str:
@@ -277,29 +273,33 @@ def render_events(lines: Iterable[str]) -> str:
     return result_text
 
 
+@contextmanager
+def background_forward(
+    reader: IO[str],
+    writer: IO[str],
+) -> Generator[None]:
+    """Forward lines from reader to writer in a background thread."""
+    thread = threading.Thread(target=forward_lines, args=(reader, writer))
+    thread.start()
+    try:
+        yield
+    finally:
+        thread.join()
+
+
 def stream_claude(prompt: str) -> str:
     """Run claude with stream-json, display events, and return output text."""
-    proc = subprocess.Popen(  # noqa: S603
+    with subprocess.Popen(  # noqa: S603
         [*CLAUDE_CMD, prompt],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-    )
-    assert proc.stdout is not None  # noqa: S101
-    assert proc.stderr is not None  # noqa: S101
+    ) as proc:
+        assert proc.stdout is not None  # noqa: S101
+        assert proc.stderr is not None  # noqa: S101
 
-    stderr_lines: list[str] = []
-    stderr_thread = threading.Thread(
-        target=forward_lines,
-        args=(proc.stderr, sys.stderr, stderr_lines),
-    )
-    stderr_thread.start()
-
-    result_text = render_events(proc.stdout)
-
-    stderr_thread.join()
-    proc.wait()
-    return result_text
+        with background_forward(proc.stderr, sys.stderr):
+            return render_events(proc.stdout)
 
 
 def run_iteration(prompt: str) -> str:
