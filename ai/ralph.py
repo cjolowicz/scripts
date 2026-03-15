@@ -69,8 +69,20 @@ def forward_lines(
         buf.append(line)
 
 
+def shorten_path(value: str) -> str:
+    """Return a path relative to cwd if it's under cwd, otherwise as-is."""
+    try:
+        from pathlib import Path
+
+        return str(Path(value).relative_to(Path.cwd()))
+    except ValueError:
+        return value
+
+
 def abbreviate(value: object, *, maxlen: int = 72) -> str:
     """Return a single-line repr of value, abbreviated if needed."""
+    if isinstance(value, str) and value.startswith("/"):
+        value = shorten_path(value)
     text = repr(value)
     if len(text) > maxlen:
         return text[: maxlen - 3] + "..."
