@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv run
+#!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.12"
 # dependencies = ["rich"]
@@ -199,21 +199,16 @@ def handle_events(lines: Iterable[str]) -> str:
     return result_text
 
 
-def stream_claude(input_data: str) -> str:
+def stream_claude(prompt: str) -> str:
     """Run claude with stream-json, display events, and return output text."""
     proc = subprocess.Popen(  # noqa: S603
-        CLAUDE_CMD,
-        stdin=subprocess.PIPE,
+        [*CLAUDE_CMD, prompt],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
     )
-    assert proc.stdin is not None  # noqa: S101
     assert proc.stdout is not None  # noqa: S101
     assert proc.stderr is not None  # noqa: S101
-
-    proc.stdin.write(input_data)
-    proc.stdin.close()
 
     stderr_lines: list[str] = []
     stderr_thread = threading.Thread(
@@ -231,8 +226,8 @@ def stream_claude(input_data: str) -> str:
 
 def run_iteration(prompt: str) -> str:
     """Run a single iteration of claude. Return 'done', 'blocked', or 'continue'."""
-    input_data = PROMPT_TEMPLATE.format(prompt=prompt)
-    output = stream_claude(input_data)
+    full_prompt = PROMPT_TEMPLATE.format(prompt=prompt)
+    output = stream_claude(full_prompt)
     if SIGNAL_DONE in output:
         return "done"
     if SIGNAL_BLOCKED in output:
