@@ -242,9 +242,7 @@ def run_iteration(prompt: str) -> str:
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Ralph Wiggum - Long-running AI agent loop",
-    )
+    parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("prompt")
     parser.add_argument("-n", "--max-iterations", type=int, default=10)
     return parser.parse_args()
