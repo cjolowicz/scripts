@@ -120,7 +120,7 @@ def render_markdown(text: str) -> None:
     Console().print(Markdown(text))
 
 
-def handle_text_block(text: str, *, after_tools: bool) -> None:
+def render_text_block(text: str, *, after_tools: bool) -> None:
     """Display a text block, adding a blank line separator after tool blocks."""
     if after_tools:
         sys.stderr.write("\n")
@@ -154,7 +154,7 @@ def render_edit(file_path: str, old_string: str, new_string: str) -> None:
     )
 
 
-def handle_tool_block(
+def render_tool_block(
     name: str,
     tool_input: dict[str, object],
     *,
@@ -203,7 +203,7 @@ def render_event(
             for block in blocks:
                 match block:
                     case {"type": "text", "text": str(text)}:
-                        handle_text_block(text, after_tools=last_block == "tool")
+                        render_text_block(text, after_tools=last_block == "tool")
                         last_block = "text"
                     case {
                         "type": "tool_use",
@@ -226,7 +226,7 @@ def render_event(
                         "name": str(name),
                         "input": dict(tool_input),
                     }:
-                        handle_tool_block(
+                        render_tool_block(
                             name,
                             tool_input,
                             after_text=last_block == "text",
@@ -244,7 +244,7 @@ def render_event(
 
 
 def render_events(lines: Iterable[str]) -> str:
-    """Parse and handle stream-json events, returning the final result text."""
+    """Parse and render stream-json events, returning the final result text."""
     result_text = ""
     last_block = ""
     for line in lines:
