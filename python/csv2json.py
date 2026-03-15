@@ -4,14 +4,15 @@ import argparse
 import csv
 import json
 import sys
+from typing import TextIO
 
 
-def to_json(source, target):
+def to_json(source: TextIO, target: TextIO) -> None:
     for data in csv.DictReader(source):
         print(json.dumps(data), file=target, flush=True)
 
 
-def from_json(source, target):
+def from_json(source: TextIO, target: TextIO) -> None:
     class Target:
         def write(self, s: str):
             target.write(s)
