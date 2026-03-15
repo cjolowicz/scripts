@@ -206,7 +206,7 @@ def render_todos(todos: list[dict[str, str]]) -> None:
     stderr.print(Panel(text, title="tasks", border_style="dim", expand=False))
 
 
-def handle_event(
+def render_event(
     event: dict[str, object],
     *,
     last_block: str,
@@ -255,7 +255,7 @@ def handle_event(
     return None, last_block
 
 
-def handle_events(lines: Iterable[str]) -> str:
+def render_events(lines: Iterable[str]) -> str:
     """Parse and handle stream-json events, returning the final result text."""
     result_text = ""
     last_block = ""
@@ -268,7 +268,7 @@ def handle_events(lines: Iterable[str]) -> str:
         except json.JSONDecodeError:
             continue
 
-        result, last_block = handle_event(event, last_block=last_block)
+        result, last_block = render_event(event, last_block=last_block)
         if result is not None:
             result_text = result
 
@@ -293,7 +293,7 @@ def stream_claude(prompt: str) -> str:
     )
     stderr_thread.start()
 
-    result_text = handle_events(proc.stdout)
+    result_text = render_events(proc.stdout)
 
     stderr_thread.join()
     proc.wait()
