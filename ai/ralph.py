@@ -19,7 +19,9 @@ from typing import TYPE_CHECKING
 
 from rich.console import Console  # type: ignore[import-untyped]
 from rich.markdown import Markdown  # type: ignore[import-untyped]
+from rich.panel import Panel  # type: ignore[import-untyped]
 from rich.syntax import Syntax  # type: ignore[import-untyped]
+from rich.text import Text  # type: ignore[import-untyped]
 
 if TYPE_CHECKING:
     import io
@@ -144,11 +146,13 @@ def handle_text_block(text: str, *, after_tools: bool) -> None:
 def render_edit(file_path: str, old_string: str, new_string: str) -> None:
     """Render an edit as a syntax-highlighted unified diff."""
     path = shorten_path(file_path)
+    old_lines = (old_string + "\n").splitlines(keepends=True)
+    new_lines = (new_string + "\n").splitlines(keepends=True)
     diff_lines = difflib.unified_diff(
-        old_string.splitlines(keepends=True),
-        new_string.splitlines(keepends=True),
-        fromfile=path,
-        tofile=path,
+        old_lines,
+        new_lines,
+        fromfile=f"a/{path}",
+        tofile=f"b/{path}",
     )
     diff_text = "".join(diff_lines)
     if not diff_text:
@@ -156,7 +160,12 @@ def render_edit(file_path: str, old_string: str, new_string: str) -> None:
 
     stderr = Console(stderr=True)
     stderr.print()
-    stderr.print(Syntax(diff_text, "diff", theme="ansi_dark"))
+    stderr.print(Panel(
+        Syntax(diff_text, "diff", theme="ansi_dark"),
+        title=path,
+        border_style="dim",
+        expand=False,
+    ))
 
 
 def handle_tool_block(
@@ -171,10 +180,10 @@ def handle_tool_block(
     sys.stderr.flush()
 
 
-STATUS_ICONS: dict[str, str] = {
-    "completed": f"{GREEN}✓{RESET}",
-    "in_progress": f"{YELLOW}●{RESET}",
-    "pending": f"{DIM}○{RESET}",
+STATUS_STYLES: dict[str, tuple[str, str]] = {
+    "completed": ("✓", "green"),
+    "in_progress": ("●", "yellow"),
+    "pending": ("○", "dim"),
 }
 
 
@@ -182,14 +191,19 @@ def render_todos(todos: list[dict[str, str]]) -> None:
     """Render a todo list as a styled checklist."""
     if not todos:
         return
-    lines = []
-    for todo in todos:
+    text = Text()
+    for i, todo in enumerate(todos):
         status = todo.get("status", "pending")
-        icon = STATUS_ICONS.get(status, "?")
+        icon, style = STATUS_STYLES.get(status, ("?", ""))
         content = todo.get("content", "")
-        lines.append(f"  {icon} {content}")
-    sys.stderr.write("\n" + "\n".join(lines) + "\n\n")
-    sys.stderr.flush()
+        if i > 0:
+            text.append("\n")
+        text.append(f"{icon} ", style=style)
+        text.append(content)
+
+    stderr = Console(stderr=True)
+    stderr.print()
+    stderr.print(Panel(text, title="tasks", border_style="dim", expand=False))
 
 
 def handle_event(
