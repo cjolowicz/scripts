@@ -9,12 +9,17 @@
 from __future__ import annotations
 
 import argparse
+import difflib
 import json
 import subprocess
 import sys
 import threading
 import time
 from typing import TYPE_CHECKING
+
+from rich.console import Console  # type: ignore[import-untyped]
+from rich.markdown import Markdown  # type: ignore[import-untyped]
+from rich.syntax import Syntax  # type: ignore[import-untyped]
 
 if TYPE_CHECKING:
     import io
@@ -126,11 +131,7 @@ def format_tool_call(name: str, tool_input: dict[str, object]) -> str:
 
 def render_markdown(text: str) -> None:
     """Render markdown text to the terminal using rich."""
-    from rich.console import Console  # type: ignore[import-untyped]
-    from rich.markdown import Markdown  # type: ignore[import-untyped]
-
-    console = Console()
-    console.print(Markdown(text))
+    Console().print(Markdown(text))
 
 
 def handle_text_block(text: str, *, after_tools: bool) -> None:
@@ -138,6 +139,24 @@ def handle_text_block(text: str, *, after_tools: bool) -> None:
     if after_tools:
         sys.stderr.write("\n")
     render_markdown(text)
+
+
+def render_edit(file_path: str, old_string: str, new_string: str) -> None:
+    """Render an edit as a syntax-highlighted unified diff."""
+    path = shorten_path(file_path)
+    diff_lines = difflib.unified_diff(
+        old_string.splitlines(keepends=True),
+        new_string.splitlines(keepends=True),
+        fromfile=path,
+        tofile=path,
+    )
+    diff_text = "".join(diff_lines)
+    if not diff_text:
+        return
+
+    stderr = Console(stderr=True)
+    stderr.print()
+    stderr.print(Syntax(diff_text, "diff", theme="ansi_dark"))
 
 
 def handle_tool_block(
@@ -186,6 +205,17 @@ def handle_event(
                     case {"type": "text", "text": str(text)}:
                         handle_text_block(text, after_tools=last_block == "tool")
                         last_block = "text"
+                    case {
+                        "type": "tool_use",
+                        "name": "Edit",
+                        "input": {
+                            "file_path": str(fp),
+                            "old_string": str(old),
+                            "new_string": str(new),
+                        },
+                    }:
+                        render_edit(fp, old, new)
+                        last_block = "tool"
                     case {
                         "type": "tool_use",
                         "name": "TodoWrite",
@@ -300,8 +330,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        print_message("interrupted")
-        sys.exit(130)
+    main()
