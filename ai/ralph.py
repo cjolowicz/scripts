@@ -152,6 +152,27 @@ def handle_tool_block(
     sys.stderr.flush()
 
 
+STATUS_ICONS: dict[str, str] = {
+    "completed": f"{GREEN}✓{RESET}",
+    "in_progress": f"{YELLOW}●{RESET}",
+    "pending": f"{DIM}○{RESET}",
+}
+
+
+def render_todos(todos: list[dict[str, str]]) -> None:
+    """Render a todo list as a styled checklist."""
+    if not todos:
+        return
+    lines = []
+    for todo in todos:
+        status = todo.get("status", "pending")
+        icon = STATUS_ICONS.get(status, "?")
+        content = todo.get("content", "")
+        lines.append(f"  {icon} {content}")
+    sys.stderr.write("\n" + "\n".join(lines) + "\n\n")
+    sys.stderr.flush()
+
+
 def handle_event(
     event: dict[str, object],
     *,
@@ -167,6 +188,11 @@ def handle_event(
                         last_block = "text"
                     case {
                         "type": "tool_use",
+                        "name": "TodoWrite",
+                    }:
+                        last_block = "tool"
+                    case {
+                        "type": "tool_use",
                         "name": str(name),
                         "input": dict(tool_input),
                     }:
@@ -174,6 +200,12 @@ def handle_event(
                             name, tool_input, after_text=last_block == "text",
                         )
                         last_block = "tool"
+        case {
+            "type": "user",
+            "tool_use_result": {"newTodos": list(todos)},
+        }:
+            render_todos(todos)
+            last_block = "tool"
         case {"type": "result", "result": str(result)}:
             return result, last_block
     return None, last_block
