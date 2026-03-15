@@ -17,7 +17,13 @@ if TYPE_CHECKING:
 
 
 PROGRAM = "ralph"
-SEPARATOR = "=" * 63
+SEPARATOR = "─" * 63
+BOLD = "\033[1m"
+DIM = "\033[2m"
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+RED = "\033[31m"
+RESET = "\033[0m"
 PROMPT_TEMPLATE = """\
 <user-prompt>
 {prompt}
@@ -54,7 +60,7 @@ CLAUDE_CMD = [
 
 def print_message(text: str) -> None:
     """Print a user-facing message to stderr."""
-    print(f"{PROGRAM}: {text}", file=sys.stderr)  # noqa: T201
+    print(f"{DIM}{PROGRAM}:{RESET} {text}", file=sys.stderr)  # noqa: T201
 
 
 def forward_lines(
@@ -127,7 +133,7 @@ def handle_tool_block(
 ) -> None:
     """Display a tool invocation block."""
     prefix = "\n" if after_text else ""
-    sys.stderr.write(f"{prefix}  {format_tool_call(name, tool_input)}\n")
+    sys.stderr.write(f"{prefix}  {DIM}{format_tool_call(name, tool_input)}{RESET}\n")
     sys.stderr.flush()
 
 
@@ -234,23 +240,24 @@ def main() -> None:
     args = parse_args()
 
     for i in range(1, args.max_iterations + 1):
-        print_message(SEPARATOR)
-        print_message(f"iteration {i}/{args.max_iterations}")
-        print_message(SEPARATOR)
+        print_message(f"{DIM}{SEPARATOR}{RESET}")
+        print_message(f"{BOLD}iteration {i}/{args.max_iterations}{RESET}")
+        print_message(f"{DIM}{SEPARATOR}{RESET}")
 
         status = run_iteration(args.prompt)
 
         if status == "done":
-            print_message(f"done at iteration {i}/{args.max_iterations}")
+            print_message(f"{GREEN}done at iteration {i}/{args.max_iterations}{RESET}")
             sys.exit(0)
 
         if status == "blocked":
-            print_message(f"blocked at iteration {i}/{args.max_iterations}")
+            n = args.max_iterations
+            print_message(f"{YELLOW}blocked at iteration {i}/{n}{RESET}")
             sys.exit(1)
 
         time.sleep(2)
 
-    print_message(f"max iterations reached ({args.max_iterations})")
+    print_message(f"{RED}max iterations reached ({args.max_iterations}){RESET}")
     sys.exit(2)
 
 
