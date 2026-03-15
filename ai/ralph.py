@@ -23,14 +23,25 @@ PROMPT_TEMPLATE = """\
 {prompt}
 </user-prompt>
 
-<termination>
-If there is truly nothing left to do at the START of this invocation, output
-<promise>COMPLETE</promise> immediately and stop. Do NOT output
-<promise>COMPLETE</promise> at the end of this invocation. This ensures that a fresh
-invocation with a fresh context window confirms completion.
-</termination>
+<signals>
+You MUST use exactly one of these signals when appropriate:
+
+<signal name="DONE">
+Output <signal>DONE</signal> immediately at the START of an invocation if there
+is truly nothing left to do. Do NOT output this signal at the end of an
+invocation. This ensures that a fresh invocation with a fresh context window
+confirms completion.
+</signal>
+
+<signal name="BLOCKED">
+Output <signal>BLOCKED</signal> if you need user input, clarification, or a
+decision before you can continue. Describe what you need, then output the
+signal. The loop will stop so the user can intervene.
+</signal>
+</signals>
 """
-COMPLETION_MARKER = "<promise>COMPLETE</promise>"
+SIGNAL_DONE = "<signal>DONE</signal>"
+SIGNAL_BLOCKED = "<signal>BLOCKED</signal>"
 CLAUDE_CMD = [
     "claude",
     "--dangerously-skip-permissions",
@@ -58,7 +69,7 @@ def forward_lines(
         buf.append(line)
 
 
-def abbreviate(value: object, *, maxlen: int = 80) -> str:
+def abbreviate(value: object, *, maxlen: int = 72) -> str:
     """Return a single-line repr of value, abbreviated if needed."""
     text = repr(value)
     if len(text) > maxlen:
@@ -185,11 +196,15 @@ def stream_claude(input_data: str) -> str:
     return result_text
 
 
-def run_iteration(prompt: str) -> bool:
-    """Run a single iteration of claude. Return True if complete."""
+def run_iteration(prompt: str) -> str:
+    """Run a single iteration of claude. Return 'done', 'blocked', or 'continue'."""
     input_data = PROMPT_TEMPLATE.format(prompt=prompt)
     output = stream_claude(input_data)
-    return COMPLETION_MARKER in output
+    if SIGNAL_DONE in output:
+        return "done"
+    if SIGNAL_BLOCKED in output:
+        return "blocked"
+    return "continue"
 
 
 def parse_args() -> argparse.Namespace:
@@ -211,16 +226,20 @@ def main() -> None:
         print_message(f"iteration {i}/{args.max_iterations}")
         print_message(SEPARATOR)
 
-        complete = run_iteration(args.prompt)
+        status = run_iteration(args.prompt)
 
-        if complete:
-            print_message(f"complete at iteration {i}/{args.max_iterations}")
+        if status == "done":
+            print_message(f"done at iteration {i}/{args.max_iterations}")
             sys.exit(0)
+
+        if status == "blocked":
+            print_message(f"blocked at iteration {i}/{args.max_iterations}")
+            sys.exit(1)
 
         time.sleep(2)
 
     print_message(f"max iterations reached ({args.max_iterations})")
-    sys.exit(1)
+    sys.exit(2)
 
 
 if __name__ == "__main__":
