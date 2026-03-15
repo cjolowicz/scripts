@@ -3,7 +3,6 @@
 # requires-python = ">=3.12"
 # dependencies = ["rich"]
 # ///
-# ruff: noqa: EXE003
 """Ralph Wiggum - Long-running AI agent loop."""
 
 from __future__ import annotations
@@ -15,6 +14,7 @@ import subprocess
 import sys
 import threading
 import time
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from rich.console import Console  # type: ignore[import-untyped]
@@ -92,8 +92,6 @@ def forward_lines(
 def shorten_path(value: str) -> str:
     """Return a path relative to cwd if it's under cwd, otherwise as-is."""
     try:
-        from pathlib import Path
-
         return str(Path(value).relative_to(Path.cwd()))
     except ValueError:
         return value
@@ -160,12 +158,14 @@ def render_edit(file_path: str, old_string: str, new_string: str) -> None:
 
     stderr = Console(stderr=True)
     stderr.print()
-    stderr.print(Panel(
-        Syntax(diff_text, "diff", theme="ansi_dark"),
-        title=path,
-        border_style="dim",
-        expand=False,
-    ))
+    stderr.print(
+        Panel(
+            Syntax(diff_text, "diff", theme="ansi_dark"),
+            title=path,
+            border_style="dim",
+            expand=False,
+        )
+    )
 
 
 def handle_tool_block(
@@ -241,7 +241,9 @@ def render_event(
                         "input": dict(tool_input),
                     }:
                         handle_tool_block(
-                            name, tool_input, after_text=last_block == "text",
+                            name,
+                            tool_input,
+                            after_text=last_block == "text",
                         )
                         last_block = "tool"
         case {
