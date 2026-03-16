@@ -192,61 +192,121 @@ def render_todos(todos: list[dict[str, str]]) -> None:
     stderr.print(Panel(text, title="tasks", border_style="dim", expand=False))
 
 
-def render_event(
-    event: dict[str, object],
-    *,
-    last_block: str,
-) -> tuple[str | None, str]:
-    """Handle a single stream-json event. Return (result, last_block_type)."""
-    match event:
-        case {"type": "assistant", "message": {"content": list(blocks)}}:
-            for block in blocks:
-                match block:
-                    case {"type": "text", "text": str(text)}:
-                        render_text_block(text, after_tools=last_block == "tool")
-                        last_block = "text"
-                    case {
-                        "type": "tool_use",
-                        "name": "Edit",
-                        "input": {
-                            "file_path": str(fp),
-                            "old_string": str(old),
-                            "new_string": str(new),
+def render_bash(command: str, output: str, duration: str) -> None:
+    """Render a Bash invocation with command, output, and timing."""
+    stderr = Console(stderr=True)
+    stderr.print()
+    lines = [f"[dim]$ {command}[/dim]"]
+    if output.strip():
+        lines.append(output.rstrip())
+    if duration:
+        lines.append(f"[dim]({duration})[/dim]")
+    stderr.print(
+        Panel(
+            "\n".join(lines),
+            border_style="dim",
+            expand=False,
+        ),
+    )
+
+
+class EventRenderer:
+    """Stateful renderer for stream-json events."""
+
+    def __init__(self) -> None:
+        """Initialize renderer state."""
+        self.last_block = ""
+        self.pending_bash: dict[str, str] = {}
+
+    def render(self, event: dict[str, object]) -> str | None:
+        """Render a single event. Return result text if final."""
+        match event:
+            case {"type": "assistant", "message": {"content": list(blocks)}}:
+                self._render_blocks(blocks)
+            case {
+                "type": "user",
+                "message": {
+                    "content": [
+                        {
+                            "tool_use_id": str(tool_id),
+                            "type": "tool_result",
+                            "content": str(output),
                         },
-                    }:
-                        render_edit(fp, old, new)
-                        last_block = "tool"
+                    ],
+                },
+            } if tool_id in self.pending_bash:
+                command = self.pending_bash.pop(tool_id)
+                duration = ""
+                match event:
                     case {
-                        "type": "tool_use",
-                        "name": "TodoWrite",
+                        "tool_use_result": {"duration_ms": int(ms)},
                     }:
-                        last_block = "tool"
-                    case {
-                        "type": "tool_use",
-                        "name": str(name),
-                        "input": dict(tool_input),
-                    }:
-                        render_tool_block(
-                            name,
-                            tool_input,
-                            after_text=last_block == "text",
-                        )
-                        last_block = "tool"
-        case {
-            "type": "user",
-            "tool_use_result": {"newTodos": list(todos)},
-        }:
-            render_todos(todos)
-            last_block = "tool"
-        case {"type": "result", "result": str(result)}:
-            return result, last_block
-    return None, last_block
+                        duration = f"{ms / 1000:.1f}s"
+                    case _:
+                        pass
+                render_bash(command, output, duration)
+                self.last_block = "tool"
+            case {
+                "type": "user",
+                "tool_use_result": {"newTodos": list(todos)},
+            }:
+                render_todos(todos)
+                self.last_block = "tool"
+            case {"type": "result", "result": str(result)}:
+                return result
+        return None
+
+    def _render_blocks(self, blocks: list[object]) -> None:
+        """Render content blocks from an assistant message."""
+        for block in blocks:
+            match block:
+                case {"type": "text", "text": str(text)}:
+                    render_text_block(
+                        text,
+                        after_tools=self.last_block == "tool",
+                    )
+                    self.last_block = "text"
+                case {
+                    "type": "tool_use",
+                    "name": "Edit",
+                    "input": {
+                        "file_path": str(fp),
+                        "old_string": str(old),
+                        "new_string": str(new),
+                    },
+                }:
+                    render_edit(fp, old, new)
+                    self.last_block = "tool"
+                case {
+                    "type": "tool_use",
+                    "id": str(tool_id),
+                    "name": "Bash",
+                    "input": {"command": str(command)},
+                }:
+                    self.pending_bash[tool_id] = command
+                    self.last_block = "tool"
+                case {
+                    "type": "tool_use",
+                    "name": "TodoWrite",
+                }:
+                    self.last_block = "tool"
+                case {
+                    "type": "tool_use",
+                    "name": str(name),
+                    "input": dict(tool_input),
+                }:
+                    render_tool_block(
+                        name,
+                        tool_input,
+                        after_text=self.last_block == "text",
+                    )
+                    self.last_block = "tool"
 
 
 def render_events(lines: Iterable[str]) -> str:
     """Parse and render stream-json events, returning the final result text."""
+    renderer = EventRenderer()
     result_text = ""
-    last_block = ""
     for line in lines:
         line = line.strip()  # noqa: PLW2901
         if not line:
@@ -256,7 +316,7 @@ def render_events(lines: Iterable[str]) -> str:
         except json.JSONDecodeError:
             continue
 
-        result, last_block = render_event(event, last_block=last_block)
+        result = renderer.render(event)
         if result is not None:
             result_text = result
 
