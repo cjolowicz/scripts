@@ -9,11 +9,12 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import functools
 import json
 import subprocess
 import sys
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
 
 from rich.console import Console  # type: ignore[import-untyped]
@@ -83,6 +84,47 @@ def shorten_path(value: str) -> str:
         return value
 
 
+@functools.cache
+def git_info() -> tuple[str, str] | None:
+    """Return (remote_url_base, commit_hash) or None if not in a git repo."""
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        remote = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+    else:
+        if remote.startswith("git@"):
+            remote = remote.replace(":", "/", 1).replace("git@", "https://", 1)
+        remote = remote.removesuffix(".git")
+        return remote, commit
+
+
+def github_permalink(
+    file_path: str, offset: int | None, limit: int | None
+) -> str | None:
+    """Return a GitHub permalink for the given file and line range."""
+    info = git_info()
+    if info is None:
+        return None
+    remote, commit = info
+    path = shorten_path(file_path)
+    url = f"{remote}/blob/{commit}/{path}"
+    if offset is not None:
+        end = offset + (limit or 1) - 1
+        url += f"#L{offset}-L{end}"
+    return url
+
+
 def abbreviate(value: object, *, maxlen: int = 72) -> str:
     """Return a single-line repr of value, abbreviated if needed."""
     if isinstance(value, str) and value.startswith("/"):
@@ -93,26 +135,48 @@ def abbreviate(value: object, *, maxlen: int = 72) -> str:
     return text
 
 
-TOOL_SUMMARY_KEYS: dict[str, str] = {
-    "Bash": "command",
-    "Read": "file_path",
-    "Edit": "file_path",
-    "Write": "file_path",
-    "Glob": "pattern",
-    "Grep": "pattern",
-    "Agent": "prompt",
-}
+def _format_read(tool_input: dict[str, object]) -> str:
+    """Format a Read tool call with path:range and GitHub permalink."""
+    path = shorten_path(str(tool_input.get("file_path", "")))
+    offset = tool_input.get("offset")
+    limit = tool_input.get("limit")
+    if isinstance(offset, int) and isinstance(limit, int):
+        path += f":{offset}-{offset + limit - 1}"
+    elif isinstance(offset, int):
+        path += f":{offset}"
+    parts = [repr(path)]
+    link = github_permalink(
+        str(tool_input.get("file_path", "")),
+        offset if isinstance(offset, int) else None,
+        limit if isinstance(limit, int) else None,
+    )
+    if link:
+        parts.append(f"\n    {DIM}{link}{RESET}")
+    return f"Read({''.join(parts)})"
+
+
+def _format_search(name: str, tool_input: dict[str, object]) -> str:
+    """Format a Grep or Glob tool call with pattern and extra filters."""
+    parts = [abbreviate(tool_input.get("pattern", ""))]
+    if "path" in tool_input:
+        parts.append(f"path={abbreviate(tool_input['path'])}")
+    if "glob" in tool_input:
+        parts.append(f"glob={abbreviate(tool_input['glob'])}")
+    return f"{name}({', '.join(parts)})"
 
 
 def format_tool_call(name: str, tool_input: dict[str, object]) -> str:
     """Format a tool invocation as a one-liner like Name(summary)."""
-    key = TOOL_SUMMARY_KEYS.get(name)
-    if key is not None and key in tool_input:
-        return f"{name}({abbreviate(tool_input[key])})"
-    if tool_input:
-        first_value = next(iter(tool_input.values()))
-        return f"{name}({abbreviate(first_value)})"
-    return f"{name}()"
+    match name:
+        case "Read":
+            return _format_read(tool_input)
+        case "Grep" | "Glob":
+            return _format_search(name, tool_input)
+        case _:
+            first_value = next(iter(tool_input.values()), None)
+            if first_value is not None:
+                return f"{name}({abbreviate(first_value)})"
+            return f"{name}()"
 
 
 def render_markdown(text: str) -> None:
@@ -152,6 +216,45 @@ def render_edit(file_path: str, old_string: str, new_string: str) -> None:
             border_style="dim",
             expand=False,
         )
+    )
+
+
+def render_write(file_path: str, content: str) -> None:
+    """Render a Write invocation with syntax-highlighted content."""
+    path = shorten_path(file_path)
+    suffix = PurePosixPath(path).suffix.lstrip(".")
+    lexer = suffix or "text"
+
+    stderr = Console(stderr=True)
+    stderr.print()
+    stderr.print(
+        Panel(
+            Syntax(content, lexer, theme="ansi_dark"),
+            title="Write",
+            subtitle=path,
+            border_style="dim",
+            expand=False,
+        ),
+    )
+
+
+def render_skill(skill_input: dict[str, object]) -> None:
+    """Render a Skill invocation with skill name and args."""
+    skill = str(skill_input.get("skill", ""))
+    args = skill_input.get("args")
+    lines = [f"[bold]{skill}[/bold]"]
+    if args:
+        lines.append(f"[dim]{args}[/dim]")
+
+    stderr = Console(stderr=True)
+    stderr.print()
+    stderr.print(
+        Panel(
+            "\n".join(lines),
+            title="Skill",
+            border_style="dim",
+            expand=False,
+        ),
     )
 
 
@@ -304,6 +407,16 @@ class EventRenderer:
                     self.last_block = "tool"
                 case {
                     "type": "tool_use",
+                    "name": "Write",
+                    "input": {
+                        "file_path": str(fp),
+                        "content": str(content),
+                    },
+                }:
+                    render_write(fp, content)
+                    self.last_block = "tool"
+                case {
+                    "type": "tool_use",
                     "id": str(tool_id),
                     "name": "Bash",
                     "input": {"command": str(command)},
@@ -316,6 +429,13 @@ class EventRenderer:
                     "input": dict(agent_input),
                 }:
                     render_agent(agent_input)
+                    self.last_block = "tool"
+                case {
+                    "type": "tool_use",
+                    "name": "Skill",
+                    "input": dict(skill_input),
+                }:
+                    render_skill(skill_input)
                     self.last_block = "tool"
                 case {
                     "type": "tool_use",
@@ -357,7 +477,7 @@ def render_events(lines: Iterable[str]) -> str:
 
 def stream_claude(prompt: str) -> str:
     """Run claude with stream-json, display events, and return output text."""
-    with subprocess.Popen(  # noqa: S603
+    with subprocess.Popen(
         [*CLAUDE_CMD, prompt],
         stdout=subprocess.PIPE,
         text=True,
