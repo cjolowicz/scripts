@@ -113,15 +113,16 @@ def github_permalink(
     file_path: str, offset: int | None, limit: int | None
 ) -> str | None:
     """Return a GitHub permalink for the given file and line range."""
-    if offset is None:
-        return None
     info = git_info()
     if info is None:
         return None
     remote, commit = info
     path = shorten_path(file_path)
-    end = offset + (limit or 1) - 1
-    return f"{remote}/blob/{commit}/{path}#L{offset}-L{end}"
+    url = f"{remote}/blob/{commit}/{path}"
+    if offset is not None:
+        end = offset + (limit or 1) - 1
+        url += f"#L{offset}-L{end}"
+    return url
 
 
 def abbreviate(value: object, *, maxlen: int = 72) -> str:
