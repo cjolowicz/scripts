@@ -147,7 +147,8 @@ def render_edit(file_path: str, old_string: str, new_string: str) -> None:
     stderr.print(
         Panel(
             Syntax(diff_text, "diff", theme="ansi_dark"),
-            title=path,
+            title="Edit",
+            subtitle=path,
             border_style="dim",
             expand=False,
         )
@@ -189,7 +190,7 @@ def render_todos(todos: list[dict[str, str]]) -> None:
 
     stderr = Console(stderr=True)
     stderr.print()
-    stderr.print(Panel(text, title="tasks", border_style="dim", expand=False))
+    stderr.print(Panel(text, title="TodoWrite", border_style="dim", expand=False))
 
 
 def render_bash(command: str, output: str, duration: str) -> None:
@@ -204,6 +205,7 @@ def render_bash(command: str, output: str, duration: str) -> None:
     stderr.print(
         Panel(
             "\n".join(lines),
+            title="Bash",
             border_style="dim",
             expand=False,
         ),
