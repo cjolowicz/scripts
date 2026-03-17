@@ -193,6 +193,29 @@ def render_todos(todos: list[dict[str, str]]) -> None:
     stderr.print(Panel(text, title="TodoWrite", border_style="dim", expand=False))
 
 
+def render_agent(agent_input: dict[str, object]) -> None:
+    """Render an Agent invocation with prompt and metadata."""
+    prompt = agent_input.get("prompt", "")
+    subtitle_parts = []
+    if "description" in agent_input:
+        subtitle_parts.append(str(agent_input["description"]))
+    if "subagent_type" in agent_input:
+        subtitle_parts.append(str(agent_input["subagent_type"]))
+    subtitle = " · ".join(subtitle_parts) or None
+
+    stderr = Console(stderr=True)
+    stderr.print()
+    stderr.print(
+        Panel(
+            str(prompt),
+            title="Agent",
+            subtitle=subtitle,
+            border_style="dim",
+            expand=False,
+        ),
+    )
+
+
 def render_bash(command: str, output: str, duration: str) -> None:
     """Render a Bash invocation with command, output, and timing."""
     stderr = Console(stderr=True)
@@ -286,6 +309,13 @@ class EventRenderer:
                     "input": {"command": str(command)},
                 }:
                     self.pending_bash[tool_id] = command
+                    self.last_block = "tool"
+                case {
+                    "type": "tool_use",
+                    "name": "Agent",
+                    "input": dict(agent_input),
+                }:
+                    render_agent(agent_input)
                     self.last_block = "tool"
                 case {
                     "type": "tool_use",
